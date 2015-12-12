@@ -97,9 +97,9 @@ SUBROUTINE WINDS_SetParameters( p, O, ErrStat, ErrMess )
    
    ! ....................................................................................................
       ! Basic parameters for simulation
-   p%FVM%NB         =   p%NumBl           ! Number of blades
-   p%FVM%NST        =   p%Element%NElm + 1   ! Number of trailing nodes (number of station +1) 
-   p%FVM%NS         =   p%Element%NElm       ! Number of shed nodes (stations)      
+   p%FVM%NB         =   p%numBlades          ! Number of blades
+   p%FVM%NST        =   p%NumBlNds + 1   ! Number of trailing nodes (number of station +1) 
+   p%FVM%NS         =   p%NumBlNds       ! Number of shed nodes (stations)      
    
    NST              =   p%FVM%NST   ! just for convenience
    NS               =   p%FVM%NS    ! just for convenience 
@@ -223,12 +223,12 @@ SUBROUTINE WINDS_Allocate( p, O, xd, ErrStat, ErrMess )
    INTEGER(IntKi)      :: NTP
    INTEGER(IntKi)      :: NTW
       
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
    NT  = p%FVM%NT 
    NT  = NT + 3    ! To make sure when using RK4, the array is big enough ...  
 
-   NB  = p%NumBl
+   NB  = p%numBlades
    NTP = p%FVM%NTP
    NTW = p%FVM%NTW_total
 
@@ -965,10 +965,10 @@ SUBROUTINE WINDS_Ground_Model(p, O, ErrStat, ErrMess)
    INTEGER(IntKi)      :: NB 
    INTEGER(IntKi)      :: NTP
       
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
    NT  = p%FVM%NT
-   NB  = p%NumBl
+   NB  = p%numBlades
    NTP = p%FVM%NTP        
    
    
@@ -1625,10 +1625,10 @@ SUBROUTINE WINDS_Kinematics(u, p, O, xd, N, ErrStat, ErrMess)
    INTEGER(IntKi)      :: IElement2    ! Index for blade trailing nodes
    INTEGER(IntKi)      :: ITimestep    ! Index for timesteps         
       
-   REAL(DbKi), DIMENSION(p%Element%NElm+1, p%NumBl)      :: BLADE_QUARTER
-   REAL(DbKi), DIMENSION(p%Element%NElm+1, p%NumBl)      :: BLADE_TRAIL
-   REAL(DbKi), DIMENSION(p%Element%NElm, p%NumBl)        :: BLADE_BOUND
-   REAL(DbKi), DIMENSION(p%Element%NElm, p%NumBl)        :: BLADE_END
+   REAL(DbKi), DIMENSION(p%NumBlNds+1, p%numBlades)      :: BLADE_QUARTER
+   REAL(DbKi), DIMENSION(p%NumBlNds+1, p%numBlades)      :: BLADE_TRAIL
+   REAL(DbKi), DIMENSION(p%NumBlNds, p%numBlades)        :: BLADE_BOUND
+   REAL(DbKi), DIMENSION(p%NumBlNds, p%numBlades)        :: BLADE_END
 
    INTEGER(IntKi)      :: NST 
    INTEGER(IntKi)      :: NS 
@@ -1637,10 +1637,10 @@ SUBROUTINE WINDS_Kinematics(u, p, O, xd, N, ErrStat, ErrMess)
 
 
    
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
    NT  = p%FVM%NT
-   NB  = p%NumBl
+   NB  = p%numBlades
 
    
    
@@ -1822,10 +1822,10 @@ SUBROUTINE WINDS_Velocity(u, p, O, xd, N, ErrStat, ErrMess)
 
   
    
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
    NT  = p%FVM%NT
-   NB  = p%NumBl
+   NB  = p%numBlades
    
 
    ! Transfer the velocity of aerodynamic center (in the inertial coordinate system)     ! sliu: it is useless but exists in Matlab code
@@ -1993,10 +1993,10 @@ CONTAINS
    REAL(DbKi)          :: DT      ! Duration of between timesteps
 
    
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
    NT  = p%FVM%NT
-   NB  = p%NumBl 
+   NB  = p%numBlades
      
    DT = p%FVM%DT_WINDS
    N  = O%WINDS_Timestep    
@@ -2096,26 +2096,26 @@ SUBROUTINE WINDS_FVMInitial(u, p, O, xd, ErrStat, ErrMess, x, z, y)
    
    
    N   =  O%WINDS_Timestep       
-   NST = p%Element%NElm + 1
-   NB  = p%NumBl
-   NS  = p%Element%NElm
+   NST = p%NumBlNds + 1
+   NB  = p%numBlades
+   NS  = p%NumBlNds
    
    
    ! IF ( p%FVM%SteadyFlag ) THEN ! Make it steady flow         
    O%FVM_Other%Wind_Mean = 0.0_DbKi
       
-   DO IBlade = 1,p%NumBl
-       DO IElement = 1,p%Element%Nelm
+   DO IBlade = 1,p%numBlades
+       DO IElement = 1,p%NumBlNds
            O%FVM_Other%Wind_Mean(1) = O%FVM_Other%Wind_Mean(1) + O%FVM_Other%WIND_INFTY(1, 1, 1, IElement, IBlade)
            O%FVM_Other%Wind_Mean(2) = O%FVM_Other%Wind_Mean(2) + O%FVM_Other%WIND_INFTY(2, 1, 1, IElement, IBlade)
            O%FVM_Other%Wind_Mean(3) = O%FVM_Other%Wind_Mean(3) + O%FVM_Other%WIND_INFTY(3, 1, 1, IElement, IBlade)
        END DO
    END DO
             
-   O%FVM_Other%Wind_Mean(:) = O%FVM_Other%Wind_Mean(:) / p%NumBl / p%Element%Nelm
+   O%FVM_Other%Wind_Mean(:) = O%FVM_Other%Wind_Mean(:) / p%numBlades / p%NumBlNds
 
-   DO IBlade = 1,p%NumBl
-       DO IElement=1,p%Element%Nelm   
+   DO IBlade = 1,p%numBlades
+       DO IElement=1,p%NumBlNds   
            O%FVM_Other%WIND_INFTY(1, 1, 1, IElement, IBlade) = O%FVM_Other%Wind_Mean(1)
            O%FVM_Other%WIND_INFTY(2, 1, 1, IElement, IBlade) = O%FVM_Other%Wind_Mean(2)
            O%FVM_Other%WIND_INFTY(3, 1, 1, IElement, IBlade) = O%FVM_Other%Wind_Mean(3)  
@@ -2244,10 +2244,10 @@ SUBROUTINE WINDS_FVM(u, p, O, xd, N, ErrStat, ErrMess)
    CHARACTER(LEN = 1024)   :: TEMP
    CHARACTER(LEN = 1024)   :: filename 
    
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
    NT  = p%FVM%NT
-   NB  = p%NumBl
+   NB  = p%numBlades
    
    
       ! Store previous time step data   
@@ -2367,10 +2367,10 @@ SUBROUTINE Aero_Loads(u, p, xd, O, ErrStat, ErrMess)
    INTEGER(IntKi)      :: N   
 
 
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
    NT  = p%FVM%NT
-   NB  = p%NumBl
+   NB  = p%numBlades
    
    N = O%WINDS_Timestep  
    
@@ -2984,17 +2984,17 @@ SUBROUTINE InducedVelocity(O, p, xd, N, CALLER, ErrStat, ErrMess)
    
    INTEGER(IntKi)      :: J, c1, c2, K   ! counter 
    
-   INTEGER(IntKi), DIMENSION(p%Element%NElm-1) :: ns_ind_1
-   INTEGER(IntKi), DIMENSION(p%Element%NElm-1) :: ns_ind_2
-   INTEGER(IntKi), DIMENSION(p%Element%NElm-1) :: ns_ind_3
+   INTEGER(IntKi), DIMENSION(p%NumBlNds-1) :: ns_ind_1
+   INTEGER(IntKi), DIMENSION(p%NumBlNds-1) :: ns_ind_2
+   INTEGER(IntKi), DIMENSION(p%NumBlNds-1) :: ns_ind_3
    
    
    CHARACTER(LEN = 1024)   :: TEMP10  ! debug
    
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
    NT  = p%FVM%NT
-   NB  = p%NumBl
+   NB  = p%numBlades
    
    NP  = p%FVM%Ground_Parms%Sqrt_Panels
       
@@ -3338,10 +3338,10 @@ SUBROUTINE Induced_Velocity_Ground_Mirror(O, p, xd, N, CALLER, ErrStat, ErrMess)
    
    INTEGER(IntKi)      :: steps   ! stored steps #?
    
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
    NT  = p%FVM%NT
-   NB  = p%NumBl
+   NB  = p%numBlades
    
    Np = p%FVM%Ground_Parms%Sqrt_Panels
    
@@ -3473,10 +3473,10 @@ SUBROUTINE Induced_Velocity_Ground_Panels(O, p, xd, N, CALLER, ErrStat, ErrMess)
    
    INTEGER(IntKi)      :: steps   ! stored steps #?
    
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
    NT  = p%FVM%NT
-   NB  = p%NumBl
+   NB  = p%numBlades
    
    Np = p%FVM%Ground_Parms%Sqrt_Panels
    
@@ -3628,10 +3628,10 @@ SUBROUTINE KuttaJoukowski(O, p, xd, N, ErrStat, ErrMess)
    REAL(DbKi),DIMENSION(p%FVM%MAXITER) :: converge
    REAL(DbKi)          :: AVE_Conv
    
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
    NT  = p%FVM%NT
-   NB  = p%NumBl
+   NB  = p%numBlades
       
 
    Iiter   =  1_IntKi
@@ -3768,10 +3768,10 @@ CONTAINS
       
       CHARACTER(LEN = 1024)   :: TEMP10  ! debug
       
-      NST = p%Element%NElm + 1
-      NS  = p%Element%NElm
+      NST = p%NumBlNds + 1
+      NS  = p%NumBlNds
       NT  = p%FVM%NT
-      NB  = p%NumBl
+      NB  = p%numBlades
       
       N   =  O%WINDS_Timestep 
               
@@ -4030,10 +4030,10 @@ CONTAINS
    INTEGER(IntKi)    :: IElement2
 
    
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
    NT  = p%FVM%NT
-   NB  = p%NumBl
+   NB  = p%numBlades
 
    DT   =   p%FVM%DT_WINDS
 
@@ -4088,10 +4088,10 @@ CONTAINS
    REAL(DbKi)        :: Temp1, Temp2 
   
    
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
    NT  = p%FVM%NT
-   NB  = p%NumBl
+   NB  = p%numBlades
    NTW = O%FVM_Other%NTW
    
    DT  = p%FVM%DT_WINDS
@@ -4184,10 +4184,10 @@ CONTAINS
    CHARACTER(LEN = 1024)   :: TEMP10  ! debug
    
    
-   NST =  p%Element%NElm + 1
-   NS  =  p%Element%NElm
+   NST =  p%NumBlNds + 1
+   NS  =  p%NumBlNds
    NT  =  p%FVM%NT
-   NB  =  p%NumBl
+   NB  =  p%numBlades
    NTW =  O%FVM_Other%NTW
    
    DT  =  p%FVM%DT_WINDS
@@ -4338,8 +4338,8 @@ SUBROUTINE Shear(O, p, CALLER, rk_count, N, ErrStat, ErrMess)
       CASE ('MAIN')       
          IF (p%FVM%Shear_Parms%ShearFLAG) THEN
              DO ITimestep = 1, NTW
-                DO IBlade = 1, p%NumBl
-                   Do IElement2 = 1, p%Element%NElm +1
+                DO IBlade = 1, p%numBlades
+                   Do IElement2 = 1, p%NumBlNds +1
                       point(1) = O%FVM_Other%WAKE_DOMAIN(1, ITimestep, 1, IElement2, IBlade)
                       point(2) = O%FVM_Other%WAKE_DOMAIN(2, ITimestep, 1, IElement2, IBlade)
                       point(3) = O%FVM_Other%WAKE_DOMAIN(3, ITimestep, 1, IElement2, IBlade)
@@ -4359,10 +4359,10 @@ SUBROUTINE Shear(O, p, CALLER, rk_count, N, ErrStat, ErrMess)
              END DO
              
          ELSE
-            Do IBlade = 1, p%NumBl
+            Do IBlade = 1, p%numBlades
                Do ITimestep = 1, NTW   
                   Do IDim = 1, 3  
-                     Do IElement2 = 1, p%Element%NElm + 1
+                     Do IElement2 = 1, p%NumBlNds + 1
                         O%FVM_Other%VEL_DOMAIN(IDim, ITimestep, 1, IElement2, IBlade ) =                   &
                                                              O%FVM_Other%WIND_INFTY(IDim, 1, 1, 1, IBlade)   ! sliu: what if not steady inflow
                      END DO  ! IElement2
@@ -4375,8 +4375,8 @@ SUBROUTINE Shear(O, p, CALLER, rk_count, N, ErrStat, ErrMess)
           
          IF (p%FVM%Shear_Parms%ShearFLAG) THEN
              DO ITimestep = 1, NTW +1
-                DO IBlade = 1, p%NumBl
-                   Do IElement2 = 1, p%Element%NElm +1
+                DO IBlade = 1, p%numBlades
+                   Do IElement2 = 1, p%NumBlNds +1
                       point(1) = O%FVM_Other%WAKE_DOMAIN(1, ITimestep, 1, IElement2, IBlade)
                       point(2) = O%FVM_Other%WAKE_DOMAIN(2, ITimestep, 1, IElement2, IBlade)
                       point(3) = O%FVM_Other%WAKE_DOMAIN(3, ITimestep, 1, IElement2, IBlade)
@@ -4401,10 +4401,10 @@ SUBROUTINE Shear(O, p, CALLER, rk_count, N, ErrStat, ErrMess)
              END DO
              
          ELSE
-            Do IBlade = 1, p%NumBl
+            Do IBlade = 1, p%numBlades
                Do ITimestep = 1, NTW + 1  
                   Do IDim = 1, 3  
-                     Do IElement2 = 1, p%Element%NElm + 1
+                     Do IElement2 = 1, p%NumBlNds + 1
                         O%FVM_Other%VEL_DOMAIN_RK(IDim, ITimestep, rk_count, IElement2, IBlade ) =     &
                                                                   O%FVM_Other%WIND_INFTY(IDim, 1, 1, 1, IBlade)
                      END DO ! IElement2
@@ -4499,9 +4499,9 @@ SUBROUTINE TOWER_SHADOW(O, p, xd, N, ErrStat, ErrMess)
    
      
 
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
-   NB  = p%NumBl
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
+   NB  = p%numBlades
    
    
    
@@ -4550,7 +4550,7 @@ SUBROUTINE UPDATE_WAKE(O, p, xd, N_plus, ErrStat, ErrMess, CALLER)
    INTEGER(IntKi)      :: NS 
    INTEGER(IntKi)      :: NB 
    REAL(DbKi)          :: DT
-   REAL(DbKi), DIMENSION(1,1,1,p%Element%NElm,p%NumBl)    :: b0, b1, b2
+   REAL(DbKi), DIMENSION(1,1,1,p%NumBlNds,p%numBlades)    :: b0, b1, b2
    REAL(DbKi)          :: Temp1, Temp2  
    INTEGER(IntKi)      :: NTW
    
@@ -4560,9 +4560,9 @@ SUBROUTINE UPDATE_WAKE(O, p, xd, N_plus, ErrStat, ErrMess, CALLER)
    ErrMess  = ""
    
    
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
-   NB  = p%NumBl
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
+   NB  = p%numBlades
    DT  = p%FVM%DT_WINDS
    NTW = O%FVM_Other%NTW +1  
    
@@ -4663,9 +4663,9 @@ SUBROUTINE VCORE(p, O, xd, N, ErrStat, ErrMess)
    
    CHARACTER(LEN = 1024)   :: TEMP10  ! debug
    
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
-   NB  = p%NumBl
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
+   NB  = p%numBlades
    NTW = O%FVM_Other%NTW +1  
 
       
@@ -4803,9 +4803,9 @@ CONTAINS
       REAL(DbKi), DIMENSION(:,:,:,:,:), ALLOCATABLE        :: STRAIN_TRAIL 
       REAL(DbKi), DIMENSION(:,:,:,:,:), ALLOCATABLE        :: STRAIN_SHED   
    
-      NST = p%Element%NElm + 1
-      NS  = p%Element%NElm
-      NB  = p%NumBl
+      NST = p%NumBlNds + 1
+      NS  = p%NumBlNds
+      NB  = p%numBlades
       NTW = O%FVM_Other%NTW +1  
       
       IF (.NOT. ALLOCATED( TRAILNEW ) )      ALLOCATE(TRAILNEW(1, NTW, 1, NST, NB))    
@@ -4923,11 +4923,11 @@ SUBROUTINE BEM(u, p, xd, O, ErrStat, ErrMess)
       INTEGER(IntKi)             :: Itera_counter      
        
       
-      NST = p%Element%NElm + 1
-      NS  = p%Element%NElm
+      NST = p%NumBlNds + 1
+      NS  = p%NumBlNds
       
       NT  = p%FVM%NT
-      NB  = p%NumBl
+      NB  = p%numBlades
 
       
       DO IElement = 1, NS  
@@ -4972,7 +4972,7 @@ SUBROUTINE BEM(u, p, xd, O, ErrStat, ErrMess)
          VNElement = -1.*DOT_PRODUCT( tmpVector, u%InputMarkers(IBlade)%TranslationVel(:,IElement ) )                 ! Component normal to the plane of rotation of deflection translational velocity alone      
           
          LAMBDAR =  p%BLADE%RNodes(IElement) * O%Rotor%REVS / O%FVM_Other%WIND_INFTYM(1, 1, 1, 1, 1)                  ! Local speed ratio
-         SIGMAP  =  p%NumBl * P%Blade%C(IElement) / ( TWOPI * p%BLADE%RNodes(IElement))                            ! Local solidity  
+         SIGMAP  =  p%numBlades * P%Blade%C(IElement) / ( TWOPI * p%BLADE%RNodes(IElement))                            ! Local solidity  
          TWST    =  - P%Element%TWIST(IElement) 
          PTCH    =  o%Element%PitNow 
 
@@ -5098,8 +5098,8 @@ CONTAINS
             
             
       ! Compute loss correction factor due to tip and hub losses       
-      TIPLOSS = 2 / Pi * ACOS(EXP(-(p%NumBl * (p%Blade%TipRadius - p%BLADE%RNodes(J)) / (2 * p%BLADE%RNodes(J) * SPHI))))      
-      HUBLOSS = 2 / Pi * ACOS(EXP(-(p%NumBl * (p%BLADE%RNodes(J) - p%Blade%HubRadius) / (2 * p%Blade%HubRadius * SPHI))))           
+      TIPLOSS = 2 / Pi * ACOS(EXP(-(p%numBlades * (p%Blade%TipRadius - p%BLADE%RNodes(J)) / (2 * p%BLADE%RNodes(J) * SPHI))))      
+      HUBLOSS = 2 / Pi * ACOS(EXP(-(p%numBlades * (p%BLADE%RNodes(J) - p%Blade%HubRadius) / (2 * p%Blade%HubRadius * SPHI))))           
       LOSS    = TIPLOSS * HUBLOSS       
             
             
