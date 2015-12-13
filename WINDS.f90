@@ -48,17 +48,34 @@ MODULE WINDS
    IMPLICIT        NONE
 
       ! ..... Public Subroutines ............
-      
-   PUBLIC :: WINDS_SetParameters   ! Set the parameters of WInDS(FVM) module
-   PUBLIC :: WINDS_Allocate        ! Allocate necessary memory for the WInDS(FVM) module
-   PUBLIC :: WINDS_Kinematics      ! Computes the station locations of each blade in the inertial coordinate system
-   PUBLIC :: WINDS_Velocity        ! Computes the velocity contributions due to turbine and platform motions and freestream flow in the inertial and blade coordinate systems.
-   PUBLIC :: WINDS_FVMInitial      ! Calculate aerodynamic loads of the first timestep by BEM
-   PUBLIC :: WINDS_FVM             ! Use free vortex wake method to calculate the aerodynamic loads after first timestep
+   public :: WINDS_Init                           ! Initialization routine
+   public :: WINDS_End                            ! Ending routine (includes clean up)
+
+   public :: WINDS_UpdateStates                   ! Loose coupling routine for solving for constraint states, integrating
+                                               !   continuous states, and updating discrete states
+   public :: WINDS_CalcOutput                     ! Routine for computing outputs
+
+   public :: WINDS_CalcConstrStateResidual        ! Tight coupling routine for returning the constraint state residual
+   public :: WINDS_CalcContStateDeriv             ! Tight coupling routine for computing derivatives of continuous states
+   public :: WINDS_UpdateDiscState                ! Tight coupling routine for updating discrete states
+   
+   
+   !PUBLIC :: WINDS_SetParameters   ! Set the parameters of WInDS(FVM) module
+   !PUBLIC :: WINDS_Allocate        ! Allocate necessary memory for the WInDS(FVM) module
+   !PUBLIC :: WINDS_Kinematics      ! Computes the station locations of each blade in the inertial coordinate system
+   !PUBLIC :: WINDS_Velocity        ! Computes the velocity contributions due to turbine and platform motions and freestream flow in the inertial and blade coordinate systems.
+   !PUBLIC :: WINDS_FVMInitial      ! Calculate aerodynamic loads of the first timestep by BEM
+   !PUBLIC :: WINDS_FVM             ! Use free vortex wake method to calculate the aerodynamic loads after first timestep
    
 
 
 CONTAINS
+    
+    
+    
+    
+    
+    
 !==================================================================================================================================
 SUBROUTINE WINDS_SetParameters( InitInp, p, O, ErrStat, ErrMess )
 ! This subroutine sets the parameters, based on the data stored in InputFileData

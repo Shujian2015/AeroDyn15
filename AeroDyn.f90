@@ -30,12 +30,6 @@ module AeroDyn
    use AirfoilInfo
    use NWTC_LAPACK
    
-   !-----Umass WINDS-----
-   USE WINDS          ! Wake Induced Dynamics Simulator
-   USE WINDS_IO       ! Deal with input and ouput files
-   ! USE WINDS_DS       ! LB Dynamic stall
-   USE WINDS_Library  ! For debug use, write internal variables to txt file...(Feel free to ask to auther for this)
-   !-----Umass WINDS-----   
    
    implicit none
 
@@ -240,15 +234,6 @@ subroutine AD_Init( InitInp, u, p, x, xd, z, OtherState, y, Interval, InitOut, E
       !............................................................................................
       ! Define parameters
       !............................................................................................
-   !.................................................................
-   ! Umass WInDS.....................................................
-   ! Get the current time
-   CALL DATE_AND_TIME ( Values=OtherState%FVM_Other%StrtTime )                        ! Let's time the whole simulation
-   CALL CPU_TIME ( OtherState%FVM_Other%UsrTime1 )                                    ! Initial time (this zeros the start time when used as a MATLAB function)
-   OtherState%FVM_Other%UsrTime1 = MAX( 0.0_DbKi, OtherState%FVM_Other%UsrTime1 )              ! CPU_TIME: If a meaningful time cannot be returned, a processor-dependent negative value is returned
-   ! Umass WInDS....................................................
-   !.................................................................         
-      
       
       ! Initialize AFI module (read Airfoil tables)
    call Init_AFIparams( InputFileData, p%AFI, UnEcho, p%NumBlades, ErrStat2, ErrMsg2 )
@@ -330,8 +315,6 @@ subroutine AD_Init( InitInp, u, p, x, xd, z, OtherState, y, Interval, InitOut, E
          call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    end if
       
-
-   
             
    call Cleanup() 
       
@@ -850,41 +833,6 @@ subroutine AD_End( u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )
       ErrMsg  = ""
 
 
-      
-      !************************************************************************************************************
-      !....WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...
-      !............................................................................................................
-      ! Umass WInDS 
-      
-         ! Close the Paraview input file
-      IF (p%FVM%AnimFLAG) THEN
-         CALL Close_paraview_files(P, xd, OtherState, ErrStat, ErrMess )
-         IF (ErrStat /= 0 ) RETURN
-      END IF
-      
-         ! Record the speedup and error of N-body algorithm or parallel computation
-      IF (p%FVM%Tree_Parms%Speedup) THEN   
-          CALL WRITE_Treecode(0_IntKi, 0_IntKi, 0.0_DbKi,  0.0_DbKi, 0.0_DbKi, 0.0_DbKi, 'END', p)
-      END IF
-      
-      ! Record the iteration number of KJ
-      IF (p%FVM%KJ_output) THEN
-         CALL WRITE_KJ(0_IntKi, 0_IntKi, 0.0_DbKi, 'END', p)
-      END IF 
-      
-      ! Summary file
-      IF (p%FVM%WINDS_Sum) THEN      
-         CALL WInDS_WriteSum(P, xd, OtherState, ErrStat, ErrMess )
-      END IF 
-      !............................................................................................................
-      !....WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...
-      !************************************************************************************************************      
-      
-      
-      
-      
-      
-      
          ! Place any last minute operations or calculations here:
 
 
@@ -1007,54 +955,12 @@ subroutine AD_CalcOutput( t, u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )
    integer(intKi)                               :: ErrStat2
    character(ErrMsgLen)                         :: ErrMsg2
    character(*), parameter                      :: RoutineName = 'AD_CalcOutput'
-
-   
-   !!.....................................................
-   !! Umass WINDS
-   !REAL(DbKi)          :: Time_1  ! To record CPU time(Start time) 
-   !REAL(DbKi)          :: Time_2  ! To record CPU time(End time)  
-   !! Umass WINDS    
-   !!.....................................................   
-   
-   !..................................... ...............     
-   ! umass debug, to be deleted
-   REAL(DbKi), DIMENSION(p%NumBlNds, p%numBlades)               :: PRINT_NAME1
-   REAL(DbKi), DIMENSION(p%NumBlNds+1, p%numBlades)             :: PRINT_NAME2
-   REAL(DbKi), DIMENSION(p%NumBlNds, 3)                     :: PRINT_NAME3   
-   
-   INTEGER(IntKi)      :: IDim        ! For dimensions
-   INTEGER(IntKi)      :: ITimestep   ! For timesteps
-   
-   INTEGER(IntKi)      :: NST 
-   INTEGER(IntKi)      :: NS
-   INTEGER(IntKi)      :: NT 
-   INTEGER(IntKi)      :: NB 
-   
-   
-   CHARACTER(LEN=2), DIMENSION(20)      :: Rank_num
-   CHARACTER(LEN=1024)                  :: temp_number
-   CHARACTER(LEN=1)                     :: temp_1 
-   CHARACTER(LEN=2)                     :: temp_2 
-   CHARACTER(LEN=3)                     :: temp_3 
-      
-   
-   
-   NST = p%NumBlNds + 1
-   NS  = p%NumBlNds
-   NT  = p%FVM%NT
-   NB  = p%numBlades     
-   
-   INTEGER(IntKi)      :: IBlade
-   INTEGER(IntKi)      :: IElement
-   
-   ! umass debug, to be deleted
-   !....................................................           
-   
    
    
    ErrStat = ErrID_None
    ErrMsg  = ""
 
+   
    call SetInputs(p, u, OtherState, errStat2, errMsg2)      
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
             
@@ -1065,327 +971,11 @@ subroutine AD_CalcOutput( t, u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
                   
    call SetOutputsFromBEMT(p, OtherState, y )
-              
-     
+                          
    if ( p%TwrAero ) then
       call ADTwr_CalcOutput(p, u, OtherState, y, ErrStat2, ErrMsg2 )
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)      
    end if
-   
-   
-         !************************************************************************************************************
-         !....WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...
-         !............................................................................................................
-         ! Umass WInDS   sliu: make it to be a subroutine
-   
-         ! Get the inflow wind speed
-         IF (OtherState%Aerodyn_Timestep == 1) THEN           
-         DO IBlade = 1,p%numBlades
-            DO IElement = 1,p%NumBlNds     
-             
-            OtherState%FVM_Other%WIND_INFTY(1, 1, 1, IElement, IBlade) = OtherState%V_diskAvg  ! disk-averaged relative wind speed, V_DiskAvg  (refer to subroutine SetInputsForBEMT) ! sliu: may have to change this part
-            OtherState%FVM_Other%WIND_INFTY(2, 1, 1, IElement, IBlade) = 0.0_ReKi
-            OtherState%FVM_Other%WIND_INFTY(3, 1, 1, IElement, IBlade) = 0.0_ReKi       
-         
-            OtherState%FVM_Other%WIND_INFTYM(1, 1, 1, IElement, IBlade) = SQRT(VelocityVec(1)**2 + VelocityVec(2)**2 + VelocityVec(3)**2 )    
-            END DO
-         END DO
-         END IF 
-         !............................................................................................................          
-         !....WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...
-         !************************************************************************************************************     
-   
-
-   !................................................................................................
-      
-   !************************************************************************************************************
-   !....WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...
-   !............................................................................................................
-   ! Umass WInDS starts
-   !
-   ! The WINDS main part:
-   !------------------------------------     
-      
-   IF ( p%FVM%UseWINDS ) THEN  
-      OtherState%FVM_Other%ZTime = time  ! The current simulation time (actual or time of prediction)
-      !........................................................
-      ! The first timestep
-         
-      IF ( OtherState%Aerodyn_Timestep == 1 )  THEN
-
-             ! Start time
-            CALL DATE_AND_TIME ( Values=OtherState%FVM_Other%SimStrtTime )
-            CALL CPU_TIME ( OtherState%FVM_Other%UsrTime2 )                                                    ! Initial CPU time   
-            OtherState%FVM_Other%UsrTime2 = MAX( 0.0_DbKi, OtherState%FVM_Other%UsrTime2 )  ! CPU_TIME: If a meaningful time cannot be returned, a processor-dependent negative value is returned
-            
-               ! Calculate positions and velocity of blades   
-            CALL WINDS_Kinematics(u, p, O, xd, OtherState%WINDS_Timestep, ErrStat, ErrMess)
-            IF (ErrStat /= 0 ) RETURN
-            
-            CALL WINDS_Velocity(u, p, O, xd, OtherState%WINDS_Timestep, ErrStat, ErrMess)    
-            IF (ErrStat /= 0 ) RETURN
-            
-            CALL WINDS_FVMInitial(u, p, O, xd, ErrStat, ErrMess, x, z, y)   !  "initials" in WInDS            
-            IF (ErrStat /= 0 ) RETURN
-            
-            DO IBlade=1,p%numBlades
-               DO IElement=1,p%NumBlNds
-                  y%BladeLoad(IBlade)%Force(1,IElement) = OtherState%FVM_Other%StoredForces(1, 1, 1, IElement, IBlade)                    
-                  y%BladeLoad(IBlade)%Force(2,IElement) = OtherState%FVM_Other%StoredForces(2, 1, 1, IElement, IBlade)                    
-                  y%BladeLoad(IBlade)%Force(3,IElement) = OtherState%FVM_Other%StoredForces(3, 1, 1, IElement, IBlade)                    
-                  y%BladeLoad(IBlade)%Moment(1,IElement) = OtherState%FVM_Other%StoredMoments(1, 1, 1, IElement, IBlade)
-                  y%BladeLoad(IBlade)%Moment(2,IElement) = OtherState%FVM_Other%StoredMoments(2, 1, 1, IElement, IBlade)
-                  y%BladeLoad(IBlade)%Moment(3,IElement) = OtherState%FVM_Other%StoredMoments(3, 1, 1, IElement, IBlade)                     
-                   
-                  OtherState%FVM_Other%PreviousForces(1, 1, 1, IElement, IBlade)  = OtherState%FVM_Other%StoredForces(1,IElement,IBlade)   ! sliu: why not  OtherState%FVM_Other%StoredForces(1, 1, 1, IElement, IBlade)  
-                  OtherState%FVM_Other%PreviousForces(2, 1, 1, IElement, IBlade)  = OtherState%FVM_Other%StoredForces(2,IElement,IBlade) 
-                  OtherState%FVM_Other%PreviousForces(3, 1, 1, IElement, IBlade)  = OtherState%FVM_Other%StoredForces(3,IElement,IBlade)   
-                  OtherState%FVM_Other%PreviousMoments(1, 1, 1, IElement, IBlade) = OtherState%FVM_Other%StoredMoments(1,IElement,IBlade)
-                  OtherState%FVM_Other%PreviousMoments(2, 1, 1, IElement, IBlade) = OtherState%FVM_Other%StoredMoments(2,IElement,IBlade)
-                  OtherState%FVM_Other%PreviousMoments(3, 1, 1, IElement, IBlade) = OtherState%FVM_Other%StoredMoments(3,IElement,IBlade)                               
-                   
-                   
-                   
-                  !y%OutputLoads(IBlade)%Force(1,IElement)  = OtherState%FVM_Other%StoredForces(1, 1, 1, IElement, IBlade)   
-                  !y%OutputLoads(IBlade)%Force(2,IElement)  = OtherState%FVM_Other%StoredForces(2, 1, 1, IElement, IBlade)   
-                  !y%OutputLoads(IBlade)%Force(3,IElement)  = OtherState%FVM_Other%StoredForces(3, 1, 1, IElement, IBlade)   
-                  !y%OutputLoads(IBlade)%Moment(1,IElement) = OtherState%FVM_Other%StoredMoments(1, 1, 1, IElement, IBlade)
-                  !y%OutputLoads(IBlade)%Moment(2,IElement) = OtherState%FVM_Other%StoredMoments(2, 1, 1, IElement, IBlade)
-                  !y%OutputLoads(IBlade)%Moment(3,IElement) = OtherState%FVM_Other%StoredMoments(3, 1, 1, IElement, IBlade)                      
-                   
-                  !OtherState%FVM_Other%PreviousForces(1, 1, 1, IElement, IBlade)  = OtherState%StoredForces(1,IElement,IBlade)  
-                  !OtherState%FVM_Other%PreviousForces(2, 1, 1, IElement, IBlade)  = OtherState%StoredForces(2,IElement,IBlade) 
-                  !OtherState%FVM_Other%PreviousForces(3, 1, 1, IElement, IBlade)  = OtherState%StoredForces(3,IElement,IBlade)   
-                  !OtherState%FVM_Other%PreviousMoments(1, 1, 1, IElement, IBlade) = OtherState%StoredMoments(1,IElement,IBlade)
-                  !OtherState%FVM_Other%PreviousMoments(2, 1, 1, IElement, IBlade) = OtherState%StoredMoments(2,IElement,IBlade)
-                  !OtherState%FVM_Other%PreviousMoments(3, 1, 1, IElement, IBlade) = OtherState%StoredMoments(3,IElement,IBlade)                               
-               ENDDO
-            ENDDO              
-                       !................................................. sliu: should make a subroutine for this 
-                       ! Debug option to ouput blade element data.
-                       IF (p%FVM%element_output) THEN                          
-                           ! umass debug.......................................
-                           PRINT_NAME1 = 0.0
-                           WRITE (temp_number, "(I6.6)") (1)    ! String of the integer With heading zeros
-                           
-                           ! CL
-                           DO IElement = 1, NS
-                               DO IBlade =  1,NB
-                                  PRINT_NAME1(IElement, IBlade) = OtherState%FVM_Other%PERF_CL(1, 1, 1, IElement, IBlade) 
-                               END DO    
-                           END DO    
-                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_cl_'// TRIM(temp_number))
-                           
-                           ! CD
-                           PRINT_NAME1 = 0.0
-                           DO IElement = 1, NS
-                               DO IBlade =  1,NB
-                                  PRINT_NAME1(IElement, IBlade) = OtherState%FVM_Other%PERF_CD(1, 1, 1, IElement, IBlade) 
-                               END DO    
-                           END DO    
-                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_cd_'// TRIM(temp_number))   
-                           
-                           ! AOA
-                           PRINT_NAME1 = 0.0
-                           DO IElement = 1, NS
-                               DO IBlade =  1,NB
-                                  PRINT_NAME1(IElement, IBlade) = OtherState%FVM_Other%PERF_AOA(1, 1, 1, IElement, IBlade) 
-                               END DO    
-                           END DO    
-                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_aoa_'// TRIM(temp_number))  
-                           
-                           !V_tot                           
-                           DO IBlade =  1,NB
-                              WRITE (temp_1, "(I1)") (IBlade)    ! String of the integer With heading zeros 
-                              PRINT_NAME3 = 0.0
-                              DO IElement = 1, NS
-                                  DO IDim =  1,3
-                                     PRINT_NAME3(IElement, IDIM) = OtherState%FVM_Other%KJ%VEL_TOT(IDIM, 1, 1, IElement, IBlade) 
-                                  END DO    
-                              END DO    
-                              CALL SAVE_TO_TXT_2D(p, PRINT_NAME3 , 'WINDS_vtot_'//temp_1//'_blade_'// TRIM(temp_number)) 
-                           END DO                            
-                          ! umass debug.......................................
-                        end if  
-            
-
-            ! ! End time
-            !CALL CPU_TIME(Time_2) 
-            !OtherState%FVM_Other%TIME%Time_Total = OtherState%FVM_Other%TIME%Time_Total + Time_2 - Time_1  
-              
-            OtherState%WINDS_Timestep =OtherState%WINDS_Timestep + 1      ! WInDS internal timestep, which is 1 ,2, 3...
-
-      !........................................................
-      ! The global timesteps used by WINDS
-           
-      ELSE IF (MOD(OtherState%Aerodyn_Timestep -1 , p%FVM%DT_RATIO) == 0 ) THEN
-            
-                ! IF ( p%FVM%SteadyFlag ) THEN ! Make it steady flow
-               DO IBlade = 1,p%numBlades
-                  DO IElement=1,p%NumBlNds   
-                     OtherState%FVM_Other%WIND_INFTY(1, OtherState%WINDS_Timestep, 1, IElement, IBlade) = OtherState%FVM_Other%WIND_INFTY(1, 1, 1, IElement, IBlade)
-                     OtherState%FVM_Other%WIND_INFTY(2, OtherState%WINDS_Timestep, 1, IElement, IBlade) = OtherState%FVM_Other%WIND_INFTY(2, 1, 1, IElement, IBlade)
-                     OtherState%FVM_Other%WIND_INFTY(3, OtherState%WINDS_Timestep, 1, IElement, IBlade) = OtherState%FVM_Other%WIND_INFTY(3, 1, 1, IElement, IBlade) 
-                     
-                     OtherState%FVM_Other%WIND_INFTYM(1, OtherState%WINDS_Timestep, 1, IElement, IBlade) = OtherState%FVM_Other%WIND_INFTYM(1,1,1,IElement,IBlade)                
-                  END DO                  
-               END DO             
-               !END IF  ! p%FVM%SteadyFlag            
-          
-                 ! Check if Wake should be cut off
-               CALL WINDS_check_cutoff(u, p, O, xd, OtherState%WINDS_Timestep, ErrStat, ErrMess)               
-               IF (ErrStat /= 0 ) RETURN
-               
-                 ! Calculate positions and velocity of blades   
-               CALL WINDS_Kinematics(u, p, O, xd, OtherState%WINDS_Timestep, ErrStat, ErrMess)
-               IF (ErrStat /= 0 ) RETURN
-               
-               CALL WINDS_Velocity(u, p, O, xd, OtherState%WINDS_Timestep, ErrStat, ErrMess)    
-               IF (ErrStat /= 0 ) RETURN
-               
-               CALL WINDS_FVM(u, p, O, xd, OtherState%WINDS_Timestep, ErrStat, ErrMess)   ! Part of the WInDS main driver       
-               IF (ErrStat /= 0 ) RETURN
-               
-               DO IBlade=1,p%numBlades
-                  DO IElement=1,p%NumBlNds
-                      
-                     y%BladeLoad(IBlade)%Force(1,IElement) = OtherState%FVM_Other%PreviousForces(1, 1, 1, IElement, IBlade)                    
-                     y%BladeLoad(IBlade)%Force(2,IElement) = OtherState%FVM_Other%PreviousForces(2, 1, 1, IElement, IBlade)                    
-                     y%BladeLoad(IBlade)%Force(3,IElement) = OtherState%FVM_Other%PreviousForces(3, 1, 1, IElement, IBlade)                    
-                     y%BladeLoad(IBlade)%Moment(1,IElement) = OtherState%FVM_Other%PreviousMoments(1, 1, 1, IElement, IBlade)
-                     y%BladeLoad(IBlade)%Moment(2,IElement) = OtherState%FVM_Other%PreviousMoments(2, 1, 1, IElement, IBlade)
-                     y%BladeLoad(IBlade)%Moment(3,IElement) = OtherState%FVM_Other%PreviousMoments(3, 1, 1, IElement, IBlade)                     
-                   
-                     OtherState%FVM_Other%PreviousForces(1, 1, 1, IElement, IBlade)  = y%BladeLoad(IBlade)%Force(1,IElement)  
-                     OtherState%FVM_Other%PreviousForces(2, 1, 1, IElement, IBlade)  = y%BladeLoad(IBlade)%Force(2,IElement) 
-                     OtherState%FVM_Other%PreviousForces(3, 1, 1, IElement, IBlade)  = y%BladeLoad(IBlade)%Force(3,IElement)    
-                     OtherState%FVM_Other%PreviousMoments(1, 1, 1, IElement, IBlade) = y%BladeLoad(IBlade)%Moment(1,IElement)
-                     OtherState%FVM_Other%PreviousMoments(2, 1, 1, IElement, IBlade) = y%BladeLoad(IBlade)%Moment(2,IElement) 
-                     OtherState%FVM_Other%PreviousMoments(3, 1, 1, IElement, IBlade) = y%BladeLoad(IBlade)%Moment(3,IElement)                       
-                                            
-                      
-                      
-                     !y%OutputLoads(IBlade)%Force(1,IElement)  = OtherState%FVM_Other%StoredForces(1, OtherState%WINDS_Timestep, 1, IElement, IBlade)   
-                     !y%OutputLoads(IBlade)%Force(2,IElement)  = OtherState%FVM_Other%StoredForces(2, OtherState%WINDS_Timestep, 1, IElement, IBlade)   
-                     !y%OutputLoads(IBlade)%Force(3,IElement)  = OtherState%FVM_Other%StoredForces(3, OtherState%WINDS_Timestep, 1, IElement, IBlade)   
-                     !y%OutputLoads(IBlade)%Moment(1,IElement) = OtherState%FVM_Other%StoredMoments(1, OtherState%WINDS_Timestep, 1, IElement, IBlade)
-                     !y%OutputLoads(IBlade)%Moment(2,IElement) = OtherState%FVM_Other%StoredMoments(2, OtherState%WINDS_Timestep, 1, IElement, IBlade)
-                     !y%OutputLoads(IBlade)%Moment(3,IElement) = OtherState%FVM_Other%StoredMoments(3, OtherState%WINDS_Timestep, 1, IElement, IBlade)                 
-                     !
-                     !OtherState%FVM_Other%PreviousForces(1, 1, 1, IElement, IBlade)  = y%OutputLoads(IBlade)%Force(1,IElement)  
-                     !OtherState%FVM_Other%PreviousForces(2, 1, 1, IElement, IBlade)  = y%OutputLoads(IBlade)%Force(2,IElement) 
-                     !OtherState%FVM_Other%PreviousForces(3, 1, 1, IElement, IBlade)  = y%OutputLoads(IBlade)%Force(3,IElement)    
-                     !OtherState%FVM_Other%PreviousMoments(1, 1, 1, IElement, IBlade) = y%OutputLoads(IBlade)%Moment(1,IElement)
-                     !OtherState%FVM_Other%PreviousMoments(2, 1, 1, IElement, IBlade) = y%OutputLoads(IBlade)%Moment(2,IElement) 
-                     !OtherState%FVM_Other%PreviousMoments(3, 1, 1, IElement, IBlade) = y%OutputLoads(IBlade)%Moment(3,IElement)                       
-                  ENDDO
-               ENDDO  
-               
-                       ! Debug option to ouput blade element data.
-                       IF (p%FVM%element_output) THEN
-                          !!..........................................................
-                          !!Umass debug              
-                           WRITE (temp_number , "(I6.6)") ( OtherState%WINDS_Timestep )   
-                      
-                           ! CL
-                           PRINT_NAME1 = 0.0
-                           DO IElement = 1, NS
-                               DO IBlade =  1,NB
-                                   PRINT_NAME1(IElement, IBlade) = OtherState%FVM_Other%PERF_CL(1, OtherState%WINDS_Timestep, 1, IElement, IBlade) 
-                               END DO  
-                           END DO  
-                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_cl_'//TRIM(temp_number))    ! Write cl to text
-                       
-                           ! CD
-                           PRINT_NAME1 = 0.0
-                           DO IElement = 1, NS
-                               DO IBlade =  1,NB
-                                   PRINT_NAME1(IElement, IBlade) = OtherState%FVM_Other%PERF_CD(1, OtherState%WINDS_Timestep, 1, IElement, IBlade) 
-                               END DO  
-                           END DO  
-                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_cd_'//TRIM(temp_number))    ! Write cd to text    
-                       
-                       
-                           ! AOA
-                           PRINT_NAME1 = 0.0
-                           DO IElement = 1, NS
-                               DO IBlade =  1,NB
-                                  PRINT_NAME1(IElement, IBlade) = OtherState%FVM_Other%PERF_AOA(1, OtherState%WINDS_Timestep, 1, IElement, IBlade) 
-                               END DO    
-                           END DO    
-                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_aoa_'// TRIM(temp_number))  
-                           
-
-                            !V_tot                           
-                           DO IBlade =  1,NB
-                              WRITE (temp_1, "(I1)") (IBlade)    ! String of the integer With heading zeros 
-                              PRINT_NAME3 = 0.0
-                              DO IElement = 1, NS
-                                  DO IDim =  1,3
-                                     PRINT_NAME3(IElement, IDIM) = OtherState%FVM_Other%KJ%VEL_TOT(IDIM, OtherState%WINDS_Timestep, 1, IElement, IBlade) 
-                                  END DO    
-                              END DO    
-                              CALL SAVE_TO_TXT_2D(p, PRINT_NAME3 , 'WINDS_vtot_'//temp_1//'_blade_'// TRIM(temp_number)) 
-                           END DO                            
-                           !!Umass debug         
-                           !!..........................................................
-                        END IF         
-                    
-              OtherState%WINDS_Timestep = OtherState%WINDS_Timestep + 1      ! WInDS internal timestep, which is 1 ,2, 3...
-              
-              ! sliu: Curently, I don't access to get the FAST simulation time. User needs to set the simulation time seperately....
-               IF (OtherState%WINDS_Timestep > p%FVM%NT ) THEN
-                   ErrStat = ErrID_Fatal
-                   ErrMESS = ' The user setting simulation time of WInDS is shorter than the FAST simulation time. '//&
-                              ' Please check the setting. '
-                   RETURN
-               END IF
-               
-         !........................................................
-         ! The global timesteps ignored by WINDS 
-                
-      ELSE
-              ! Copy the load from the previous timestep(refer to OtherState%Aerodyn_Timestep)
-            DO IBlade=1,p%numBlades
-               DO IElement=1,p%NumBlNds
-                  y%BladeLoad(IBlade)%Force(1,IElement)  = OtherState%FVM_Other%PreviousForces(1, 1, 1, IElement, IBlade)   
-                  y%BladeLoad(IBlade)%Force(2,IElement)  = OtherState%FVM_Other%PreviousForces(2, 1, 1, IElement, IBlade)
-                  y%BladeLoad(IBlade)%Force(3,IElement)  = OtherState%FVM_Other%PreviousForces(3, 1, 1, IElement, IBlade)  
-                  y%BladeLoad(IBlade)%Moment(1,IElement) = OtherState%FVM_Other%PreviousMoments(1, 1, 1, IElement, IBlade)
-                  y%BladeLoad(IBlade)%Moment(2,IElement) = OtherState%FVM_Other%PreviousMoments(2, 1, 1, IElement, IBlade)
-                  y%BladeLoad(IBlade)%Moment(3,IElement) = OtherState%FVM_Other%PreviousMoments(3, 1, 1, IElement, IBlade)
-                                      
-                  !y%OutputLoads(IBlade)%Force(1,IElement)  = OtherState%FVM_Other%PreviousForces(1, 1, 1, IElement, IBlade)   
-                  !y%OutputLoads(IBlade)%Force(2,IElement)  = OtherState%FVM_Other%PreviousForces(2, 1, 1, IElement, IBlade)
-                  !y%OutputLoads(IBlade)%Force(3,IElement)  = OtherState%FVM_Other%PreviousForces(3, 1, 1, IElement, IBlade)  
-                  !y%OutputLoads(IBlade)%Moment(1,IElement) = OtherState%FVM_Other%PreviousMoments(1, 1, 1, IElement, IBlade)
-                  !y%OutputLoads(IBlade)%Moment(2,IElement) = OtherState%FVM_Other%PreviousMoments(2, 1, 1, IElement, IBlade)
-                  !y%OutputLoads(IBlade)%Moment(3,IElement) = OtherState%FVM_Other%PreviousMoments(3, 1, 1, IElement, IBlade)
-               ENDDO
-            ENDDO         
-      END IF ! ( OtherState%Aerodyn_Timestep == -1 ) 
-         
-      OtherState%Aerodyn_Timestep = OtherState%Aerodyn_Timestep  + 1   ! Update the global timestep
-
-
-   ENDIF  ! p%FVM%UseWINDS
-   
-   !------------------------------------
-   ! Umass WInDS ends
-   !............................................................................................................
-   !....WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...   
-   !************************************************************************************************************
-
-         
-   
-   
-   
-   
-   
-   
-   
-   
-   
          
    !-------------------------------------------------------   
    !     get values to output to file:  
@@ -2073,104 +1663,6 @@ SUBROUTINE Init_BEMTmodule( InputFileData, u_AD, u, p, x, xd, z, OtherState, y, 
    call BEMT_Init(InitInp, u, p%BEMT,  x, xd, z, OtherState, p%AFI%AFInfo, y, Interval, InitOut, ErrStat2, ErrMsg2 )
       call SetErrStat(ErrStat2,ErrMsg2, ErrStat, ErrMsg, RoutineName)   
          
-      
-   
-   
-   !************************************************************************************************************   
-   !....WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...   
-   !............................................................................................................
-   ! Umass WInDS starts
-   !------------------------------------
-   
-   !p%Blade%TipRadius      =    TipRadius         ! sliu: maybe do this: TipRadius = InitInp%TurbineComponents%BladeLength + HubRadius
-   !p%Blade%HubRadius      =    HubRadius         ! = DOT_PRODUCT( InitInp%TurbineComponents%Blade(1)%Position(:) - InitInp%TurbineComponents%Hub%Position(:),  InitInp%TurbineComponents%Blade(1)%Orientation(3,:) ) 
-
-   p%FVM%UseWINDS         =    .TRUE.            ! whether to use WINDS
-   OtherState%Aerodyn_Timestep     =    0                ! The timestep used in FAST and AeroDyn (Same as n_t_global in FAST_Prog.f90)
-   OtherState%WINDS_Timestep       =    1                 ! The timestep in  WINDS,  (OtherState%WINDS_Timestep - 1) * Dt_Ratio - 1 = OtherState%Aerodyn_Timestep
-
-  
-   OtherState%FVM_Other%TIME%Time_Total  = 0.0            ! Total time of WINDS
-   OtherState%FVM_Other%TIME%Time_biotsavart  = 0.0       ! Total time of Inducevelocity subroutine
-   OtherState%FVM_Other%TIME%Time_biotsavart_Acce  = 0.0 ! Total time of biotsavart subroutine
-   
-
-
-   ! Read input file
-   CALL WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
-   IF (ErrStat /= 0 ) RETURN
-
-      ! Set parameters
-   CALL WINDS_SetParameters( InitInp, p, O, ErrStat, ErrMess )
-   IF (ErrStat /= 0 ) RETURN
-   
-     ! Allocate valuables
-   CALL WINDS_Allocate( p, O, xd, ErrStat, ErrMess )
-   IF (ErrStat /= 0 ) RETURN
-   
-     ! Wind shear 
-   IF (p%FVM%Shear_Parms%ShearFLAG ) THEN
-      CALL WINDS_Shear_Model(p, O, ErrStat, ErrMess)
-      IF (ErrStat /= 0 ) RETURN
-   END IF
-         
-     ! Ground effects
-   IF (p%FVM%Ground_Parms%GroundFLAG  .AND.  p%FVM%Ground_Parms%METHOD == 'PANEL') THEN
-      CALL WINDS_Ground_model(p, O, ErrStat, ErrMess)
-      IF (ErrStat /= 0 ) RETURN
-   END IF   
-      
-   !! Calculate varibles for LB dynamic stall
-   !IF (p%FVM%DS_Parms%DS_Flag) THEN
-   !    
-   !   ! sliu: do not load data any more .. 
-   !   IF (p%FVM%DS_Parms%load_data) THEN 
-   !      CALL LB_load_AirfoilData(p, O, xd, ErrStat, ErrMess) 
-   !   ELSE
-   !      CALL LB_Initialize_AirfoilData(p, O, xd, ErrStat, ErrMess)
-   !   END IF      
-   !   p%FVM%DS_Parms%start_n = FLOOR( p%FVM%DS_Parms%start_t / p%FVM%DT_WINDS + 1 )
-   !   ! Write these variables into txt file for debug purpose
-   !   IF (p%FVM%DS_Parms%write_data) THEN
-   !      CALL Write_DS_parameters(p, O, ErrStat, ErrMess)
-   !   END IF
-   !   IF ( ErrStat /= 0 )  RETURN   
-   !ELSE 
-   !   p%FVM%DS_Parms%start_n = p%FVM%NT + 1
-   !            
-   !END IF      
-   
-      ! Initialize paraview animation files (.pvd) 
-   IF (p%FVM%AnimFLAG) THEN
-      CALL Initialize_paraview_files(P, xd, O, ErrStat, ErrMess )
-      IF (ErrStat /= 0 ) RETURN
-   END IF
-   
-       ! Record the speedup and error of N-body algorithm or parallel computation
-   IF (p%FVM%Tree_Parms%Speedup) THEN   
-       CALL WRITE_Treecode(0_IntKi, 0_IntKi, 0.0_DbKi,  0.0_DbKi, 0.0_DbKi, 0.0_DbKi, 'START', p)
-   END IF
-   
-      ! Record the iteration number of KJ
-   IF (p%FVM%KJ_output) THEN
-      CALL WRITE_KJ(0_IntKi, 0_IntKi, 0.0_DbKi,  'START', p)
-   END IF   
-   
-   
-   !------------------------------------
-   ! Umass WInDS ends
-   !............................................................................................................
-   !....WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...   
-   !************************************************************************************************************        
-         
-      
-      
-      
-      
-      
-      
-      
-      
    if (.not. equalRealNos(Interval, p%DT) ) &
       call SetErrStat( ErrID_Fatal, "DTAero was changed in Init_BEMTmodule(); this is not allowed.", ErrStat2, ErrMsg2, RoutineName)
    
