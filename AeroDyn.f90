@@ -33,7 +33,7 @@ module AeroDyn
    !-----Umass WINDS-----
    USE WINDS          ! Wake Induced Dynamics Simulator
    USE WINDS_IO       ! Deal with input and ouput files
-   USE WINDS_DS       ! LB Dynamic stall
+   ! USE WINDS_DS       ! LB Dynamic stall
    USE WINDS_Library  ! For debug use, write internal variables to txt file...(Feel free to ask to auther for this)
    !-----Umass WINDS-----   
    
@@ -330,97 +330,7 @@ subroutine AD_Init( InitInp, u, p, x, xd, z, OtherState, y, Interval, InitOut, E
          call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    end if
       
-   
-   
-   !************************************************************************************************************   
-   !....WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...   
-   !............................................................................................................
-   ! Umass WInDS starts
-   !------------------------------------
-   
-   p%Blade%TipRadius      =    TipRadius         ! sliu: maybe do this: TipRadius = InitInp%TurbineComponents%BladeLength + HubRadius
-   p%Blade%HubRadius      =    HubRadius         ! = DOT_PRODUCT( InitInp%TurbineComponents%Blade(1)%Position(:) - InitInp%TurbineComponents%Hub%Position(:),  InitInp%TurbineComponents%Blade(1)%Orientation(3,:) ) 
 
-   p%FVM%UseWINDS         =    .TRUE.            ! whether to use WINDS
-   OtherState%Aerodyn_Timestep     =    0                ! The timestep used in FAST and AeroDyn (Same as n_t_global in FAST_Prog.f90)
-   OtherState%WINDS_Timestep       =    1                 ! The timestep in  WINDS,  (OtherState%WINDS_Timestep - 1) * Dt_Ratio - 1 = OtherState%Aerodyn_Timestep
-
-  
-   OtherState%FVM_Other%TIME%Time_Total  = 0.0            ! Total time of WINDS
-   OtherState%FVM_Other%TIME%Time_biotsavart  = 0.0       ! Total time of Inducevelocity subroutine
-   OtherState%FVM_Other%TIME%Time_biotsavart_Acce  = 0.0 ! Total time of biotsavart subroutine
-   
-
-
-   ! Read input file
-   CALL WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
-   IF (ErrStat /= 0 ) RETURN
-
-      ! Set parameters
-   CALL WINDS_SetParameters( p, O, ErrStat, ErrMess )
-   IF (ErrStat /= 0 ) RETURN
-   
-     ! Allocate valuables
-   CALL WINDS_Allocate( p, O, xd, ErrStat, ErrMess )
-   IF (ErrStat /= 0 ) RETURN
-   
-     ! Wind shear 
-   IF (p%FVM%Shear_Parms%ShearFLAG ) THEN
-      CALL WINDS_Shear_Model(p, O, ErrStat, ErrMess)
-      IF (ErrStat /= 0 ) RETURN
-   END IF
-         
-     ! Ground effects
-   IF (p%FVM%Ground_Parms%GroundFLAG  .AND.  p%FVM%Ground_Parms%METHOD == 'PANEL') THEN
-      CALL WINDS_Ground_model(p, O, ErrStat, ErrMess)
-      IF (ErrStat /= 0 ) RETURN
-   END IF   
-      
-   ! Calculate varibles for LB dynamic stall
-   IF (p%FVM%DS_Parms%DS_Flag) THEN
-       
-      ! sliu: do not load data any more .. 
-      IF (p%FVM%DS_Parms%load_data) THEN 
-         CALL LB_load_AirfoilData(p, O, xd, ErrStat, ErrMess) 
-      ELSE
-         CALL LB_Initialize_AirfoilData(p, O, xd, ErrStat, ErrMess)
-      END IF      
-      p%FVM%DS_Parms%start_n = FLOOR( p%FVM%DS_Parms%start_t / p%FVM%DT_WINDS + 1 )
-      ! Write these variables into txt file for debug purpose
-      IF (p%FVM%DS_Parms%write_data) THEN
-         CALL Write_DS_parameters(p, O, ErrStat, ErrMess)
-      END IF
-      IF ( ErrStat /= 0 )  RETURN   
-   ELSE 
-      p%FVM%DS_Parms%start_n = p%FVM%NT + 1
-               
-   END IF      
-   
-      ! Initialize paraview animation files (.pvd) 
-   IF (p%FVM%AnimFLAG) THEN
-      CALL Initialize_paraview_files(P, xd, O, ErrStat, ErrMess )
-      IF (ErrStat /= 0 ) RETURN
-   END IF
-   
-       ! Record the speedup and error of N-body algorithm or parallel computation
-   IF (p%FVM%Tree_Parms%Speedup) THEN   
-       CALL WRITE_Treecode(0_IntKi, 0_IntKi, 0.0_DbKi,  0.0_DbKi, 0.0_DbKi, 0.0_DbKi, 'START', p)
-   END IF
-   
-      ! Record the iteration number of KJ
-   IF (p%FVM%KJ_output) THEN
-      CALL WRITE_KJ(0_IntKi, 0_IntKi, 0.0_DbKi,  'START', p)
-   END IF   
-   
-
-       
-   
-   !------------------------------------
-   ! Umass WInDS ends
-   !............................................................................................................
-   !....WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...   
-   !************************************************************************************************************        
-   
    
             
    call Cleanup() 
@@ -2163,6 +2073,104 @@ SUBROUTINE Init_BEMTmodule( InputFileData, u_AD, u, p, x, xd, z, OtherState, y, 
    call BEMT_Init(InitInp, u, p%BEMT,  x, xd, z, OtherState, p%AFI%AFInfo, y, Interval, InitOut, ErrStat2, ErrMsg2 )
       call SetErrStat(ErrStat2,ErrMsg2, ErrStat, ErrMsg, RoutineName)   
          
+      
+   
+   
+   !************************************************************************************************************   
+   !....WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...   
+   !............................................................................................................
+   ! Umass WInDS starts
+   !------------------------------------
+   
+   !p%Blade%TipRadius      =    TipRadius         ! sliu: maybe do this: TipRadius = InitInp%TurbineComponents%BladeLength + HubRadius
+   !p%Blade%HubRadius      =    HubRadius         ! = DOT_PRODUCT( InitInp%TurbineComponents%Blade(1)%Position(:) - InitInp%TurbineComponents%Hub%Position(:),  InitInp%TurbineComponents%Blade(1)%Orientation(3,:) ) 
+
+   p%FVM%UseWINDS         =    .TRUE.            ! whether to use WINDS
+   OtherState%Aerodyn_Timestep     =    0                ! The timestep used in FAST and AeroDyn (Same as n_t_global in FAST_Prog.f90)
+   OtherState%WINDS_Timestep       =    1                 ! The timestep in  WINDS,  (OtherState%WINDS_Timestep - 1) * Dt_Ratio - 1 = OtherState%Aerodyn_Timestep
+
+  
+   OtherState%FVM_Other%TIME%Time_Total  = 0.0            ! Total time of WINDS
+   OtherState%FVM_Other%TIME%Time_biotsavart  = 0.0       ! Total time of Inducevelocity subroutine
+   OtherState%FVM_Other%TIME%Time_biotsavart_Acce  = 0.0 ! Total time of biotsavart subroutine
+   
+
+
+   ! Read input file
+   CALL WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
+   IF (ErrStat /= 0 ) RETURN
+
+      ! Set parameters
+   CALL WINDS_SetParameters( InitInp, p, O, ErrStat, ErrMess )
+   IF (ErrStat /= 0 ) RETURN
+   
+     ! Allocate valuables
+   CALL WINDS_Allocate( p, O, xd, ErrStat, ErrMess )
+   IF (ErrStat /= 0 ) RETURN
+   
+     ! Wind shear 
+   IF (p%FVM%Shear_Parms%ShearFLAG ) THEN
+      CALL WINDS_Shear_Model(p, O, ErrStat, ErrMess)
+      IF (ErrStat /= 0 ) RETURN
+   END IF
+         
+     ! Ground effects
+   IF (p%FVM%Ground_Parms%GroundFLAG  .AND.  p%FVM%Ground_Parms%METHOD == 'PANEL') THEN
+      CALL WINDS_Ground_model(p, O, ErrStat, ErrMess)
+      IF (ErrStat /= 0 ) RETURN
+   END IF   
+      
+   !! Calculate varibles for LB dynamic stall
+   !IF (p%FVM%DS_Parms%DS_Flag) THEN
+   !    
+   !   ! sliu: do not load data any more .. 
+   !   IF (p%FVM%DS_Parms%load_data) THEN 
+   !      CALL LB_load_AirfoilData(p, O, xd, ErrStat, ErrMess) 
+   !   ELSE
+   !      CALL LB_Initialize_AirfoilData(p, O, xd, ErrStat, ErrMess)
+   !   END IF      
+   !   p%FVM%DS_Parms%start_n = FLOOR( p%FVM%DS_Parms%start_t / p%FVM%DT_WINDS + 1 )
+   !   ! Write these variables into txt file for debug purpose
+   !   IF (p%FVM%DS_Parms%write_data) THEN
+   !      CALL Write_DS_parameters(p, O, ErrStat, ErrMess)
+   !   END IF
+   !   IF ( ErrStat /= 0 )  RETURN   
+   !ELSE 
+   !   p%FVM%DS_Parms%start_n = p%FVM%NT + 1
+   !            
+   !END IF      
+   
+      ! Initialize paraview animation files (.pvd) 
+   IF (p%FVM%AnimFLAG) THEN
+      CALL Initialize_paraview_files(P, xd, O, ErrStat, ErrMess )
+      IF (ErrStat /= 0 ) RETURN
+   END IF
+   
+       ! Record the speedup and error of N-body algorithm or parallel computation
+   IF (p%FVM%Tree_Parms%Speedup) THEN   
+       CALL WRITE_Treecode(0_IntKi, 0_IntKi, 0.0_DbKi,  0.0_DbKi, 0.0_DbKi, 0.0_DbKi, 'START', p)
+   END IF
+   
+      ! Record the iteration number of KJ
+   IF (p%FVM%KJ_output) THEN
+      CALL WRITE_KJ(0_IntKi, 0_IntKi, 0.0_DbKi,  'START', p)
+   END IF   
+   
+   
+   !------------------------------------
+   ! Umass WInDS ends
+   !............................................................................................................
+   !....WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...WInDS...   
+   !************************************************************************************************************        
+         
+      
+      
+      
+      
+      
+      
+      
+      
    if (.not. equalRealNos(Interval, p%DT) ) &
       call SetErrStat( ErrID_Fatal, "DTAero was changed in Init_BEMTmodule(); this is not allowed.", ErrStat2, ErrMsg2, RoutineName)
    

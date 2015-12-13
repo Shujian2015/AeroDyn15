@@ -12,12 +12,376 @@
 # File last committed $Date: 2015-10-03 21:17:42 -0600 (Sat, 03 Oct 2015) $
 # (File) Revision #: $Rev: 166 $
 # URL: $HeadURL: https://windsvn.nrel.gov/WT_Perf/branches/v4.x/Source/dependencies/AeroDyn/AeroDyn_Registry.txt $
+# Modified by Shujian Liu, Dec 12, 2015 (These lines are commented with "Umass WINDS")
 ###################################################################################################################################
 # ...... Include files (definitions from NWTC Library) ............................................................................
 include	Registry_NWTC_Library.txt
 usefrom	AirfoilInfo_Registry.txt
 usefrom	BEMT_Registry.txt
 usefrom	UnsteadyAero_Registry.txt
+
+
+
+
+### Umass WINDS starts:
+# BEMParms
+typedef	AeroDyn/AD	BEMParms	DbKi	TOL	-	-	-	"Tolerance"
+typedef	^	BEMParms	IntKi	MAX_ITER	-	-	-	
+typedef	^	BEMParms	DbKi	WT	-	-	-	"Weighting factor on corrections to balance speed with stability"
+
+# TreeParms
+typedef	AeroDyn/AD	TreeParms	LOGICAL	TreeFlag	-	-	-	"Whether use treecode algorithm"
+typedef	^	TreeParms	IntKi	cores	-	-	-
+typedef	^	TreeParms	DbKi	theta	-	-	-	
+typedef	^	TreeParms	IntKi	order	-	-	-
+typedef	^	TreeParms	IntKi	maxparnode	-	-	-
+typedef	^	TreeParms	DbKi	dist_tol	-	-	-
+typedef	^	TreeParms	DbKi	delta	-	-	-
+typedef	^	TreeParms	LOGICAL	Speedup	-	-	-
+typedef	^	TreeParms	CHARACTER(4)	Freq	-	-	-
+
+# OpenMPParms
+typedef	AeroDyn/AD	OpenMPParms	LOGICAL	Accelerate	-	-	-	"Whether use OpenMP"
+typedef	^	OpenMPParms	IntKi	OpenMPCores	-	-	-
+
+# GPUParms
+typedef	AeroDyn/AD	GPUParms	LOGICAL	Accelerate	-	-	-	"Whether use treecode algorithm/GPU"
+typedef	^	GPUParms	LOGICAL	Speedup	-	-	-	
+typedef	^	GPUParms	LOGICAL	GPUFlag	-	-	-	"Whether use GPU"
+typedef	^	GPUParms	IntKi	GPUHW	{3}	-	-	"[Thread Count, Number of GPUs, GPU Device Indices]"
+typedef	^	GPUParms	CHARACTER(4)	GPURUN	-	-	-	"'fuln' or ...."
+typedef	^	GPUParms	LOGICAL	OMP	-	-	-	
+
+# TwrParms
+typedef	AeroDyn/AD	TwrParms	LOGICAL	TWRFLAG	-	-	-	"Tower: Include induced velocity from tower effects (true or false)"
+typedef	^	TwrParms	IntKi	TWRUPDOWN	-	-	-	"Tower: Upwind rotor=1, Downwind rotor=2"
+typedef	^	TwrParms	IntKi	TWRMETHOD	-	-	-	"Tower: Basic potential flow=1, Aerodyn=2"
+
+# GroundParms
+typedef	AeroDyn/AD	GroundParms	LOGICAL	GroundFLAG	-	-	-	"Include vortex panels to model ground effects (true or false)"
+typedef	^	GroundParms	CHARACTER(5)	Method	-	-	-	"Can be 'IMAGE' or 'PANEL'"
+typedef	^	GroundParms	LOGICAL	Saved_Geometry	-	-	-	"Use previously saved ground geometry and influence coeff matrix if 'panel'"
+typedef	^	GroundParms	IntKi	Sqrt_Panels	-	-	-	"Square root of the number of panels (i.e. single dimension of panel matrix)"
+typedef	^	GroundParms	IntKi	Extent	{4}	-	-	"[xmin xmax ymin ymax]"
+
+# WindShearParms
+typedef	AeroDyn/AD	WindShearParms	LOGICAL	ShearFLAG	-	-	-
+typedef	^	WindShearParms	IntKi	model_type	-	-	-	"power law = 1, log law = 2, log law with stability = 3"
+typedef	^	WindShearParms	DbKi	z_ref	-	-	-	"height at which wind.infty is defined"
+typedef	^	WindShearParms	DbKi	alpha	-	-	-	"power law exponent"
+typedef	^	WindShearParms	DbKi	z0	-	-	-	"roughness length"
+
+# RLVortexModel
+typedef	AeroDyn/AD	RLVortexModel	DbKi	ALPHA	-	-	-
+typedef	^	RLVortexModel	DbKi	NU	-	-	-
+typedef	^	RLVortexModel	DbKi	DELTA	-	-	-
+typedef	^	RLVortexModel	DbKi	A1	-	-	-
+
+# DSParms
+typedef	AeroDyn/AD	DSParms	LOGICAL	DS_Flag	-	-	-
+typedef	^	DSParms	LOGICAL	relax_tune	-	-	-
+typedef	^	DSParms	DbKi	start_t	-	-	-
+typedef	^	DSParms	IntKi	start_n	-	-	-
+typedef	^	DSParms	LOGICAL	load_data	-	-	-
+typedef	^	DSParms	CHARACTER(1024)	load_file	-	-	-
+#typedef	^	DSParms	IntKi	af_select	-	-	-	
+#typedef	^	DSParms	IntKi	f_mdl	-	-	-	
+typedef	^	DSParms	DbKi	indicial	{4}	-	-	
+typedef	^	DSParms	DbKi	time_const	{4}	-	-
+typedef	^	DSParms	LOGICAL	write_data	-	-	-	
+
+# FVMParmsTYPE
+typedef	AeroDyn/AD	FVMParmsTYPE	LOGICAL	UseWINDS	-	-	-	"Whether to use winds"
+typedef	^	FVMParmsTYPE	LOGICAL	WINDS_Sum	-	-	-	"Whether to write summary for winds"
+typedef	^	FVMParmsTYPE	CHARACTER(1024)	WINDS_dir	-	-	-	
+typedef	^	FVMParmsTYPE	IntKi	Total_Time	-	-	-	
+typedef	^	FVMParmsTYPE	IntKi	NB	-	-	-	"Number of blades"
+typedef	^	FVMParmsTYPE	IntKi	NS	-	-	-	"Number of spanwise stations"
+typedef	^	FVMParmsTYPE	IntKi	NST	-	-	-	"Number of spanwise stations + 1"
+typedef	^	FVMParmsTYPE	IntKi	NT	-	-	-	"Total timesteps: count from 1"
+typedef	^	FVMParmsTYPE	IntKi	NTP	-	-	-	"Number of time steps stored in the arrays. To keep memory reasonable, usually ~3-4."
+typedef	^	FVMParmsTYPE	IntKi	DT_RATIO	-	-	-	"DT_WINDS / DT_AERODYN"
+typedef	^	FVMParmsTYPE	DbKi	DT_WINDS	-	-	-	
+typedef	^	FVMParmsTYPE	LOGICAL	SteadyFlag	-	-	-	"Whether steady inflow wind"
+typedef	^	FVMParmsTYPE	LOGICAL	WakeFLAG	-	-	-	
+typedef	^	FVMParmsTYPE	LOGICAL	Roll	-	-	-	"Whether to apply induction to all wake nodes"
+typedef	^	FVMParmsTYPE	IntKi	RollDist	-	-	-	
+typedef	^	FVMParmsTYPE	IntKi	NTW_total	-	-	-
+typedef	^	FVMParmsTYPE	IntKi	WakeDist	-	-	-	
+typedef	^	FVMParmsTYPE	IntKi	WakeNum	-	-	-	
+typedef ^   FVMParmsTYPE    DbKi    AveSpeed    -   -   -
+typedef ^   FVMParmsTYPE    LOGICAL uindpast    -   -   -   
+typedef	^	FVMParmsTYPE	LOGICAL	ViscFLAG	-	-	-	"Whether viscous model for filaments"
+typedef	^	FVMParmsTYPE	IntKi	VISC	-	-	-	"Index of Vatistas viscous model"
+typedef	^	FVMParmsTYPE	DbKi	DELTA	-	-	-	"Smoothing parameter when no viscous model for filaments"
+typedef	^	FVMParmsTYPE	CHARACTER(3)	INTEG	-	-	-	"Numerical integration scheme"
+typedef	^	FVMParmsTYPE	DbKi	TOL	-	-	-	"Tolerance value for convergence of numerical methods"
+typedef	^	FVMParmsTYPE	DbKi	CO	-	-	-	"Distance from wake nodes beyond which influence is negligible (useful??)"
+typedef	^	FVMParmsTYPE	DbKi	RELAX	-	-	-	"Relaxation value for fixed-point iteration"
+typedef	^	FVMParmsTYPE	IntKi	MAXITER	-	-	-	"Maximum number of iterations for Kutta-Joukowski theorem"
+typedef	^	FVMParmsTYPE	LOGICAL	extrap_wake	-	-	-	"Use quadratic extrapolation to guess next bound vorticity value, otherwise use previous value as initial guess"
+typedef	^	FVMParmsTYPE	LOGICAL	KJ_output	-	-	-	"Whether to ouput the KJ iteration number"
+typedef	^	FVMParmsTYPE	LOGICAL	element_output	-	-	-	"Whether to ouput the blade elements' aoa"
+typedef	^	FVMParmsTYPE	CHARACTER(15)	CURRENT_TIME	-	-	-	"Date and time of code execution"
+typedef	^	FVMParmsTYPE	LOGICAL	AnimFLAG	-	-	-	"If true, will generate animation of wake evolution"
+typedef	^	FVMParmsTYPE	CHARACTER(1024)	AnimRootDIR	-	-	-	"Root directory for paraview visualizations"
+typedef	^	FVMParmsTYPE	BEMParms	BEM_Parms	-	-	-	
+typedef	^	FVMParmsTYPE	OpenMPParms	OpenMP_Parms	-	-	-	
+typedef	^	FVMParmsTYPE	TreeParms	Tree_Parms	-	-	-	
+#typedef	^	FVMParmsTYPE	GPUParms	GPU_Parms	-	-	-	"Variables related to Parallel/GPU computing"
+typedef	^	FVMParmsTYPE	TwrParms	Twr_Parms	-	-	-	"Variables for tower shadow"
+typedef	^	FVMParmsTYPE	GroundParms	Ground_Parms	-	-	-	"Variables for ground effects inclusion"
+typedef	^	FVMParmsTYPE	WindShearParms	Shear_Parms	-	-	-	
+typedef	^	FVMParmsTYPE	RLVortexModel	RL_Model	-	-	-	"Constants associated with Ramasamy-Leishman vortex model"
+typedef	^	FVMParmsTYPE	DSParms	DS_Parms	-	-	-	"Dynamic Stall model"
+typedef	^	FVMParmsTYPE	DbKi	RHO	-	-	-	"Atmospheric density (Standard at MSL)"
+typedef	^	FVMParmsTYPE	DbKi	Gravity	-	-	-	
+typedef	^	FVMParmsTYPE	DbKi	TURBINE_ShftTilt	-	-	-	
+
+# Ground_other
+typedef	AeroDyn/AD	Ground_other	IntKi	Np	-	-	-	"square root of number of panels"
+typedef	^	Ground_other	IntKi	x_min	-	-	-	
+typedef	^	Ground_other	IntKi	x_max	-	-	-
+typedef	^	Ground_other	DbKi	dx	-	-	-
+typedef	^	Ground_other	IntKi	xp	{:}{1}	-	-
+typedef	^	Ground_other	IntKi	y_min	-	-	-	
+typedef	^	Ground_other	IntKi	y_max	-	-	-
+typedef	^	Ground_other	DbKi	dy	-	-	-
+typedef	^	Ground_other	IntKi	yp	{:}{:}	-	-
+typedef	^	Ground_other	IntKi	zp	{:}{1}	-	-
+typedef	^	Ground_other	DbKi	xp_mesh	{:}{:}{:}	-	-
+typedef	^	Ground_other	DbKi	yp_mesh	{:}{:}{:}	-	-
+typedef	^	Ground_other	DbKi	zp_mesh	{:}{:}{:}	-	-
+typedef	^	Ground_other	DbKi	co	-	-	-
+typedef	^	Ground_other	DbKi	Gamma	{:}{:}	-	-
+typedef	^	Ground_other	DbKi	p	{:}{:}	-	-
+typedef	^	Ground_other	DbKi	b	{:}{:}	-	-
+typedef	^	Ground_other	DbKi	n_vec	{:}{3}	-	-
+typedef	^	Ground_other	DbKi	P_source	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	gamma_grid	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	rc_grid	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	grid_righttop	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	grid_rightbottom	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	grid_leftbottom	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	grid_lefttop	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	V_ind_top_main	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	V_ind_right_main	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	V_ind_bottom_main	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	V_ind_left_main	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	V_ind_top_kj	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	V_ind_right_kj	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	V_ind_bottom_kj	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	V_ind_left_kj	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	V_n	{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	Vind_mirtmp_SHED	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	Vind_mirtmp_TRAIL	{:}{:}{:}{:}{:}	-	-
+typedef	^	Ground_other	DbKi	VindB_mirtmp_SHED	{:}{:}{:}{:}{:}	-	-	
+typedef	^	Ground_other	DbKi	VindB_mirtmp_TRAIL	{:}{:}{:}{:}{:}	-	-
+typedef	^	Ground_other	DbKi	MIRROR	{:}{:}{:}{:}{:}	-	-
+typedef	^	Ground_other	DbKi	WAKE_MIRROR	{:}{:}{:}{:}{:}	-	-
+typedef	^	Ground_other	DbKi	GAMMA_SHED_MIRROR	{:}{:}{:}{:}{:}	-	-
+typedef	^	Ground_other	DbKi	GAMMA_TRAIL_MIRROR	{:}{:}{:}{:}{:}	-	-
+
+# KJ_iter
+typedef	AeroDyn/AD	KJ_iter	DbKi	RELAX		-	-
+typedef	^	KJ_iter	DbKi	DG	{:}{:}{:}{:}{:}	-	-
+typedef	^	KJ_iter	DbKi	GAMMA1	{:}{:}{:}{:}{:}	-	-
+typedef	^	KJ_iter	DbKi	CL	{:}{:}{:}{:}{:}	-	-
+typedef	^	KJ_iter	DbKi	CD	{:}{:}{:}{:}{:}	-	-
+typedef	^	KJ_iter	DbKi	CM	{:}{:}{:}{:}{:}	-	-
+typedef	^	KJ_iter	DbKi	VEL_ROT	{:}{:}{:}{:}{:}	-	-
+typedef	^	KJ_iter	DbKi	VEL_TOT	{:}{:}{:}{:}{:}	-	-
+typedef	^	KJ_iter	DbKi	U	{:}{:}{:}{:}{:}	-	-
+typedef	^	KJ_iter	DbKi	V	{:}{:}{:}{:}{:}	-	-
+typedef	^	KJ_iter	DbKi	W	{:}{:}{:}{:}{:}	-	-
+typedef	^	KJ_iter	DbKi	Vinf	{:}{:}{:}{:}{:}	-	-
+typedef	^	KJ_iter	DbKi	Vtot	{:}{:}{:}{:}{:}	-	-
+typedef	^	KJ_iter	DbKi	AOA	{:}{:}{:}{:}{:}	-	-
+
+# DS_other
+typedef	AeroDyn/AD	DS_other	DbKi	global_previous_alpha	{:}{:}	-	-
+typedef	^	DS_other	DbKi	global_current_alpha	{:}{:}	-	-
+typedef	^	DS_other	DbKi	global_previous_sigma1	{:}{:}	-	-
+typedef	^	DS_other	DbKi	global_current_sigma1	{:}{:}	-	-
+typedef	^	DS_other	DbKi	global_previous_sigma3	{:}{:}	-	-
+typedef	^	DS_other	DbKi	global_current_sigma3	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_previous_q	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_current_q	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_previous_X1	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_current_X1	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_previous_X2	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_current_X2	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_previous_K_alpha	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_current_K_alpha	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_previous_dK_alpha	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_current_dK_alpha	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_previous_K_q	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_current_K_q	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_previous_dK_q	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_current_dK_q	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_previous_ddK_q	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_current_ddK_q	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_previous_C_p_n	{:}{:}	-	-
+typedef	^	DS_other	DbKi	attached_current_C_p_n	{:}{:}	-	-
+typedef	^	DS_other	DbKi	TEsep_previous_D_p	{:}{:}	-	-
+typedef	^	DS_other	DbKi	TEsep_current_D_p	{:}{:}	-	-
+typedef	^	DS_other	DbKi	TEsep_previous_D_f	{:}{:}	-	-
+typedef	^	DS_other	DbKi	TEsep_current_D_f	{:}{:}	-	-
+typedef	^	DS_other	DbKi	TEsep_previous_f_prime	{:}{:}	-	-
+typedef	^	DS_other	DbKi	TEsep_current_f_prime	{:}{:}	-	-
+typedef	^	DS_other	DbKi	TEsep_previous_f_2prime	{:}{:}	-	-
+typedef	^	DS_other	DbKi	TEsep_current_f_2prime	{:}{:}	-	-
+typedef	^	DS_other	DbKi	LEsep_previous_tau_v	{:}{:}	-	-
+typedef	^	DS_other	DbKi	LEsep_current_tau_v	{:}{:}	-	-
+typedef	^	DS_other	DbKi	LEsep_previous_C_v_n	{:}{:}	-	-
+typedef	^	DS_other	DbKi	LEsep_current_C_v_n	{:}{:}	-	-
+typedef	^	DS_other	DbKi	LEsep_previous_C_v	{:}{:}	-	-
+typedef	^	DS_other	DbKi	LEsep_current_C_v	{:}{:}	-	-
+typedef	^	DS_other	DbKi	global_sigma2	{:}{:}	-	-
+typedef	^	DS_other	IntKi	LEsep_vortex_shed_start	{:}{:}	-	-
+typedef	^	DS_other	IntKi	LEsep_seperating	{:}{:}	-	-
+typedef	^	DS_other	IntKi	global_ca_mdl_change	{:}{:}	-	-
+typedef	^	DS_other	IntKi	global_ca_mdl	{:}{:}{:}	-	-
+typedef	^	DS_other	IntKi	global_ca_mdl_over_write	{:}{:}	-	-
+
+
+# airfoils_LB
+typedef	AeroDyn/AD	airfoils_LB	DbKi	A1	{:}	-	-
+typedef	^	airfoils_LB	DbKi	A2	{:}	-	-
+typedef	^	airfoils_LB	DbKi	b1	{:}	-	-
+typedef	^	airfoils_LB	DbKi	b2	{:}	-	-
+typedef	^	airfoils_LB	DbKi	Tp	{:}	-	-
+typedef	^	airfoils_LB	DbKi	Tf	{:}	-	-
+typedef	^	airfoils_LB	DbKi	Tv	{:}	-	-
+typedef	^	airfoils_LB	DbKi	Tvl	{:}	-	-
+typedef	^	airfoils_LB	DbKi	cn	{:}{:}	-	-
+typedef	^	airfoils_LB	DbKi	ca	{:}{:}	-	-
+typedef	^	airfoils_LB	DbKi	Cn_alpha	{:}	-	-
+typedef	^	airfoils_LB	DbKi	Alpha_0	{:}	-	-
+typedef	^	airfoils_LB	DbKi	C_d_0	{:}	-	-
+typedef	^	airfoils_LB	DbKi	C_m_0	{:}	-	-
+typedef	^	airfoils_LB	DbKi	C_n_0	{:}	-	-
+typedef	^	airfoils_LB	DbKi	alpha_1	{:}	-	-
+typedef	^	airfoils_LB	DbKi	alpha_2	{:}	-	-
+typedef	^	airfoils_LB	DbKi	a	{:}{:}	-	-
+typedef	^	airfoils_LB	DbKi	S	{:}{:}	-	-
+typedef	^	airfoils_LB	DbKi	c	{:}{:}	-	-
+typedef	^	airfoils_LB	DbKi	recovery_factor	{:}	-	-
+typedef	^	airfoils_LB	DbKi	C_n_1	{:}	-	-
+typedef	^	airfoils_LB	DbKi	C_n_2	{:}	-	-
+typedef	^	airfoils_LB	DbKi	ca_K1	{:}	-	-
+typedef	^	airfoils_LB	DbKi	aoa_KHn	{:}	-	-
+typedef	^	airfoils_LB	DbKi	aoa_KHp	{:}	-	-
+typedef	^	airfoils_LB	IntKi	pp_size	{:}{:}	-	-
+typedef	^	airfoils_LB	DbKi	pp_f_breaks	{:}{:}	-	-
+typedef	^	airfoils_LB	DbKi	pp_f_coefs	{:}{:}{:}	-	-
+typedef	^	airfoils_LB	DbKi	pp_K_Ca_breaks	{:}{:}	-	-
+typedef	^	airfoils_LB	DbKi	pp_K_Ca_coefs	{:}{:}{:}	-	-
+typedef	^	airfoils_LB	DbKi	pp_K_Cn_breaks	{:}{:}	-	-
+typedef	^	airfoils_LB	DbKi	pp_K_Cn_coefs	{:}{:}{:}	-	-
+typedef	^	airfoils_LB	DbKi	pp_K_Cm_breaks	{:}{:}	-	-
+typedef	^	airfoils_LB	DbKi	pp_K_Cm_coefs	{:}{:}{:}	-	-
+
+# Time_other
+typedef	AeroDyn/AD	Time_other	DbKi	Time_Total	-	-	-
+typedef	^	Time_other	DbKi	Time_biotsavart	-	-	-	
+typedef	^	Time_other	DbKi	Time_biotsavart_Acce	-	-	-	
+
+# FVM_OtherStateTYPE
+typedef	AeroDyn/AD	FVM_OtherStateTYPE	CHARACTER(1024)	FullDIR	-	-	-	
+typedef	^	FVM_OtherStateTYPE	DbKi	POS_AEROCENT	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	POS_LEAD	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	POS_BOUND	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	POS_COLLOC	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	POS_QUARTER	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	POS_TRAIL	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	POS_END	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	POS_NODES_BXN	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	POS_NODES_BYN	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	POS_NODES_BZN	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	PERF_CL	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	PERF_CD	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	PERF_AOA	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	PERF_PHI	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	PERF_A	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	PERF_AAP	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	PERF_AP	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	PERF_TSR	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	PERF_DCZ	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	PERF_DCX	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	PERF_CM	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_AEROCENT	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_BOUND	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_BLADE	{:}{:}{:}{:}{:}	-	
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_DOMAIN	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_DOMAIN_RK	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UIND	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UINDB	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UIND_RK	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UIND_GROUND	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UINDB_GROUND	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UIND_MIRROR	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UINDB_MIRROR	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UIND_SHED	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UIND_TRAIL	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UINDB_TRAIL	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UINDB_SHED	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UINDB_TRAIL_pre	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UINDB_SHED_pre	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UIND_SHED_GROUND_P	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UIND_TRAIL_GROUND_P	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UIND_GROUND_P	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	VEL_UIND_TOWER	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	WAKE_DOMAIN	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	WAKE_RE_SHED	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	WAKE_RE_TRAIL	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	WAKE_RC_SHED	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	WAKE_RC_TRAIL	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	WAKE_LENGTH_SHED	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	WAKE_LENGTH_TRAIL	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	WAKE_RC_EFF_SHED	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	WAKE_RC_EFF_TRAIL	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	WAKE_GAMMA_SHED	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	WAKE_GAMMA_TRAIL	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	WIND_INFTY	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	WIND_INFTYM	{:}{:}{:}{:}{:}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	Wind_Mean {3}	-	-	"If steady inflow, the mean wind speed"
+typedef	^	FVM_OtherStateTYPE	DbKi	StoredForces	{:}{:}{:}{:}{:}	-	-	"Aerodynamic forces"
+typedef	^	FVM_OtherStateTYPE	DbKi	StoredMoments	{:}{:}{:}{:}{:}	-	-	"Aerodynamic Moments"
+typedef	^	FVM_OtherStateTYPE	DbKi	PreviousForces	{:}{:}{:}{:}{:}	-	-	"Aerodynamic forces"
+typedef	^	FVM_OtherStateTYPE	DbKi	PreviousMoments	{:}{:}{:}{:}{:}	-	-	"Aerodynamic Moments"
+typedef	^	FVM_OtherStateTYPE	DbKi	TipSpdRat	-	-	-	
+typedef	^	FVM_OtherStateTYPE	DbKi	AzimuthAngle	-	-	-	
+typedef	^	FVM_OtherStateTYPE	DbKi	WAKE_R0	{:}	-	-	
+typedef	^	FVM_OtherStateTYPE	IntKi	RK_counter	-	-	-	
+typedef	^	FVM_OtherStateTYPE	Ground_other	Ground	-	-	-	
+typedef	^	FVM_OtherStateTYPE	KJ_iter	KJ	-	-	-	
+typedef	^	FVM_OtherStateTYPE	DS_other	DS	-	-	-	
+typedef	^	FVM_OtherStateTYPE	airfoils_LB	airfoils_LB	-	-	-	
+typedef	^	FVM_OtherStateTYPE	Time_other	TIME	-	-	-	"timer for debug or research"
+typedef	^	FVM_OtherStateTYPE	IntKi	NTW	-	-	-	
+typedef	^	FVM_OtherStateTYPE	IntKi	ntroll	-	-	-	
+typedef	^	FVM_OtherStateTYPE	IntKi	StrtTime	{8}	-	-	
+typedef	^	FVM_OtherStateTYPE	DbKi	UsrTime1	-	-	-	
+typedef	^	FVM_OtherStateTYPE	DbKi	UsrTime2	-	-	-	
+typedef	^	FVM_OtherStateTYPE	IntKi	SimStrtTime	{8}	-	-
+typedef	^	FVM_OtherStateTYPE	DbKi	ZTime	-	-	-	"The current simulation time (actual or time of prediction)"
+### Umass WINDS ends
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # ..... Initialization data .......................................................................................................
 # Define inputs that the initialization routine may need here:
@@ -46,6 +410,10 @@ typedef	^	AD_BladePropsType	ReKi	BlCrvAng	{:}	-	-	"Curve angle at blade node"	ra
 typedef	^	AD_BladePropsType	ReKi	BlTwist	{:}	-	-	"Twist at blade node"	radians
 typedef	^	AD_BladePropsType	ReKi	BlChord	{:}	-	-	"Chord at blade node"	m
 typedef	^	AD_BladePropsType	IntKi	BlAFID	{:}	-	-	"ID of Airfoil at blade node"	-
+
+
+
+
 
 # ..... Primary Input file data ...................................................................................................
 typedef	^	AD_InputFile	DbKi	DTAero	-	-	-	"Time interval for aerodynamic calculations {or "default"}"	s
@@ -117,6 +485,11 @@ typedef	^	OtherStateType	ReKi	V_DiskAvg	{3}	-	-	"disk-average relative wind spee
 typedef	^	OtherStateType	ReKi	V_dot_x	-	-	-
 typedef	^	OtherStateType	MeshType	HubLoad	-	-	-	"mesh at hub; used to compute an integral for mapping the output blade loads to a single point (for writing to file only)"	-
 typedef	^	OtherStateType	MeshMapType	B_L_2_H_P	{:}	-	-	"mapping data structure to map each bladeLoad output mesh to the OtherState%HubLoad mesh"
+### Umass WINDS starts:
+typedef	^	OtherStateType	IntKi	Aerodyn_Timestep	-	-	-
+typedef	^	OtherStateType	IntKi	WINDS_Timestep	-	-	-	"Current timestep (counts from 1, while FAST counts from 0)  "
+typedef	^	OtherStateType	FVM_OtherStateTYPE	FVM_Other
+### Umass WINDS ends
 
 # ..... Parameters ................................................................................................................
 # Define parameters here:
@@ -144,7 +517,15 @@ typedef	^	ParameterType	IntKi	NBlOuts	-	-	-	"Number of blade node outputs [0 - 9
 typedef	^	ParameterType	IntKi	BlOutNd	{9}	-	-	"Blade nodes whose values will be output"	-
 typedef	^	ParameterType	IntKi	NTwOuts	-	-	-	"Number of tower node outputs [0 - 9]"	-
 typedef	^	ParameterType	IntKi	TwOutNd	{9}	-	-	"Tower nodes whose values will be output"	-
-
+### Umass WINDS starts:
+typedef	^	ParameterType	FVMParmsTYPE	FVM
+typedef	^	ParameterType	IntKi	n_TMax_m1	-	-	-	"The time step of TMax - dt (the end time of the simulation)"
+#typedef	^	ParameterType	DbKi	Blade_TipRadius	-	-	-	
+#typedef	^	ParameterType	DbKi	Blade_HubRadius	-	-	-	
+typedef	^	ParameterType	DbKi	Blade_RTrail	{:}	-	-	
+typedef	^	ParameterType	DbKi	Blade_RNodes	{:}	-	-	"sum P%Blade%DR"
+typedef ^	ParameterType	DbKi	Blade_AeroCen	{:}	-	-	"The relative location of aerodynamic center"
+### Umass WINDS ends 
 
 # ..... Inputs ....................................................................................................................
 # Define inputs that are contained on the mesh here:

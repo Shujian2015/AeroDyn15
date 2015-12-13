@@ -39,7 +39,7 @@ MODULE WINDS
    USE AeroDyn_Types
    USE WINDS_IO          ! Handle input and output
    USE WINDS_Accelerate  ! Acceleration of Biot-Savart Law 
-   USE WINDS_DS          ! LB Dynamic stall
+   ! USE WINDS_DS          ! LB Dynamic stall
    USE WINDS_Library     ! Some subroutines for debug
    USE WINDS_Treecode    ! Treecode algorithm to speedup 
    
@@ -60,7 +60,7 @@ MODULE WINDS
 
 CONTAINS
 !==================================================================================================================================
-SUBROUTINE WINDS_SetParameters( p, O, ErrStat, ErrMess )
+SUBROUTINE WINDS_SetParameters( InitInp, p, O, ErrStat, ErrMess )
 ! This subroutine sets the parameters, based on the data stored in InputFileData
 ! Called from: AD_Init (in AeroDyn.f90)
 ! (~ part of WInDS.m, constants.m, NRELrotor.m)
@@ -78,6 +78,7 @@ SUBROUTINE WINDS_SetParameters( p, O, ErrStat, ErrMess )
 
 
       ! Passed variables
+   type(BEMT_InitInputType), intent(in   )    :: InitInp       ! Input data for initialization routine
    TYPE(AD_ParameterType),   INTENT(INOUT)    :: p              ! The module's parameter data
    TYPE(AD_OtherStateType),  INTENT(INOUT)    :: O              ! Other/optimization states   
    INTEGER(IntKi),           INTENT(OUT)      :: ErrStat        ! The error status code
@@ -105,7 +106,7 @@ SUBROUTINE WINDS_SetParameters( p, O, ErrStat, ErrMess )
    NS               =   p%FVM%NS    ! just for convenience 
    
 
-   p%FVM%DT_WINDS   =   p%FVM%DT_RATIO  * p%DtAero             ! Timestep duration in WInDS
+   p%FVM%DT_WINDS   =   p%FVM%DT_RATIO  * p%DT             ! Timestep duration in WInDS
    
    IF ( p%FVM%DT_WINDS >= 0.2 .OR. p%FVM%DT_WINDS <= 0.01)  THEN
       ErrStat = ErrID_Fatal 
@@ -139,26 +140,34 @@ SUBROUTINE WINDS_SetParameters( p, O, ErrStat, ErrMess )
    
    !-----------------------------------------------------------------------------------------------------
       ! Parameters for blade element
-   IF (.NOT. ALLOCATED( p%BLADE%RTrail ) )      ALLOCATE( p%BLADE%RTrail(NST)) 
-   IF (.NOT. ALLOCATED( p%BLADE%AeroCen ) )     ALLOCATE( p%BLADE%AeroCen(NS))    
-   IF (.NOT. ALLOCATED( p%BLADE%RNodes ) )      ALLOCATE( p%BLADE%RNodes(NS)) 
+   IF (.NOT. ALLOCATED( p%BLADE_RTrail ) )      ALLOCATE( p%BLADE_RTrail(NST)) 
+   IF (.NOT. ALLOCATED( p%BLADE_AeroCen ) )     ALLOCATE( p%BLADE_AeroCen(NS))    
+   IF (.NOT. ALLOCATED( p%BLADE_RNodes ) )      ALLOCATE( p%BLADE_RNodes(NS)) 
 
-   p%BLADE%RTrail     =  0.0_DbKi
-   p%BLADE%AeroCen    =  0.25_DbKi   ! sliu: thin airfoil assumption
-   p%BLADE%RNodes     =  0.0_DbKi
+   p%BLADE_RTrail     =  0.0_DbKi
+   p%BLADE_AeroCen    =  0.25_DbKi   ! sliu: thin airfoil assumption
+   p%BLADE_RNodes     =  0.0_DbKi
 
    
    ! In the Matlab WInDS, these data is stored in NRELrotor.m
-   p%BLADE%RNodes(1) =  p%HubRad + p%Blade%DR(1)/2
+   !p%BLADE_RNodes(1) =  InitInp%zTip(1) + p%BLADE_DR(1)/2
+   !DO IElement = 2, p%FVM%NS
+   !   p%BLADE_RNodes(IElement) = p%BLADE_RNodes(IElement-1) +(p%BLADE_DR(IElement-1) + p%BLADE_DR(IElement))/2
+   !END DO
+   !
+   !p%BLADE_RTrail(1) = InitInp%zTip(1)
+   !DO IElement2 = 2, p%FVM%NST
+   !   p%BLADE_RTrail (IElement2) = p%BLADE_RTrail(IElement2 -1) + p%BLADE_DR(IElement2 -1)
+   !END DO
+   p%BLADE_RNodes(1) =  InitInp%zTip(1) + InputFileData%BladeProps(1)%BlSpn(1)/2
    DO IElement = 2, p%FVM%NS
-      p%BLADE%RNodes(IElement) = p%BLADE%RNodes(IElement-1) +(p%Blade%DR(IElement-1) + p%Blade%DR(IElement))/2
+      p%BLADE_RNodes(IElement) = p%BLADE_RNodes(IElement-1) +(InputFileData%BladeProps(1)%BlSpn(IElement-1) + p%BLADE_DR(IElement))/2
    END DO
 
-   p%BLADE%RTrail(1) = p%HubRad
+   p%BLADE_RTrail(1) = InitInp%zTip(1)
    DO IElement2 = 2, p%FVM%NST
-      p%BLADE%RTrail (IElement2) = p%BLADE%RTrail(IElement2 -1) + p%Blade%DR(IElement2 -1)
-   END DO
-       
+      p%BLADE_RTrail (IElement2) = p%BLADE_RTrail(IElement2 -1) + InputFileData%BladeProps(1)%BlSpn(IElement2 -1)
+   END DO       
 
    
    !-----------------------------------------------------------------------------------------------------
@@ -881,15 +890,15 @@ SUBROUTINE WINDS_Allocate( p, O, xd, ErrStat, ErrMess )
    IF (.NOT. ALLOCATED( O%FVM_Other%KJ%CM ) )           ALLOCATE( O%FVM_Other%KJ%CM(1, 1, 1, NS,  NB))     
    
    
-   ! Space for LB dynamic stall
-   IF (p%FVM%DS_Parms%DS_Flag) THEN
-      CALL LB_Initialize_Variables(p, O, xd, ErrStat, ErrMess)
-      IF ( ErrStat /= 0 ) THEN
-         ErrMess = ' Error allocating space for O%FVM_Other%DS.'
-         ErrStat = ErrID_Fatal
-         RETURN         
-      END IF 
-   END IF
+   !! Space for LB dynamic stall
+   !IF (p%FVM%DS_Parms%DS_Flag) THEN
+   !   CALL LB_Initialize_Variables(p, O, xd, ErrStat, ErrMess)
+   !   IF ( ErrStat /= 0 ) THEN
+   !      ErrMess = ' Error allocating space for O%FVM_Other%DS.'
+   !      ErrStat = ErrID_Fatal
+   !      RETURN         
+   !   END IF 
+   !END IF
    
   
    
@@ -1660,13 +1669,13 @@ SUBROUTINE WINDS_Kinematics(u, p, O, xd, N, ErrStat, ErrMess)
    DO IBlade = 1, NB
       DO IElement = 1, NS 
          O%FVM_Other%POS_END(1, N, 1, IElement, IBlade) = O%FVM_Other%POS_AEROCENT(1, N, 1, IElement, IBlade) +     &  
-                                                          (1 - p%Blade%AEROCEN(IElement)) * p%blade%C(IElement) *   &
+                                                          (1 - p%BLADE_AEROCEN(IElement)) * p%BLADE_C(IElement) *   &
                                                           u%InputMarkers(IBlade)%Orientation(2,1,IElement)  
          O%FVM_Other%POS_END(2, N, 1, IElement, IBlade) = O%FVM_Other%POS_AEROCENT(2, N, 1, IElement, IBlade) +     &
-                                                          (1 - p%Blade%AEROCEN(IElement)) * p%blade%C(IElement)     &  
+                                                          (1 - p%BLADE_AEROCEN(IElement)) * p%BLADE_C(IElement)     &  
                                                            * u%InputMarkers(IBlade)%Orientation(2,2,IElement) 
          O%FVM_Other%POS_END(3, N, 1, IElement, IBlade) = O%FVM_Other%POS_AEROCENT(3, N, 1, IElement, IBlade) +    &
-                                                          (1 - p%Blade%AEROCEN(IElement)) * p%blade%C(IElement)    &
+                                                          (1 - p%BLADE_AEROCEN(IElement)) * p%BLADE_C(IElement)    &
                                                            * u%InputMarkers(IBlade)%Orientation(2,3,IElement) 
       END DO
    END DO 
@@ -1690,8 +1699,8 @@ SUBROUTINE WINDS_Kinematics(u, p, O, xd, N, ErrStat, ErrMess)
                                                     QUADRATIC_INTERP(O%FVM_Other%POS_BOUND(IDim, N, 1, 1, IBlade),  &  
                                                                      O%FVM_Other%POS_BOUND(IDim, N, 1, 2, IBlade),  &
                                                                      O%FVM_Other%POS_BOUND(IDim, N, 1, 3, IBlade),  &
-                                                                     p%BLADE%RNodes(1), p%BLADE%RNodes(2), p%BLADE%RNodes(3), &
-                                                                     p%BLADE%RTrail(1))
+                                                                     p%BLADE_RNodes(1), p%BLADE_RNodes(2), p%BLADE_RNodes(3), &
+                                                                     p%BLADE_RTrail(1))
          
 
          DO IElement2 = 2, NST - 2
@@ -1699,23 +1708,23 @@ SUBROUTINE WINDS_Kinematics(u, p, O, xd, N, ErrStat, ErrMess)
                                                        QUADRATIC_INTERP(O%FVM_Other%POS_BOUND(IDim, N, 1, IElement2 -1, IBlade),  &    
                                                                         O%FVM_Other%POS_BOUND(IDim, N, 1, IElement2, IBlade),     &
                                                                         O%FVM_Other%POS_BOUND(IDim, N, 1, IElement2 +1, IBlade),  &
-                                                                        p%BLADE%RNodes(IElement2 -1),                             &
-                                                                        p%BLADE%RNodes(IElement2),                                &
-                                                                        p%BLADE%RNodes(IElement2 +1),                             &
-                                                                        p%BLADE%RTrail(IElement2)  )
+                                                                        p%BLADE_RNodes(IElement2 -1),                             &
+                                                                        p%BLADE_RNodes(IElement2),                                &
+                                                                        p%BLADE_RNodes(IElement2 +1),                             &
+                                                                        p%BLADE_RTrail(IElement2)  )
          END DO             
              
          O%FVM_Other%POS_QUARTER(IDim, N, 1, NST -1, IBlade) = QUADRATIC_INTERP(O%FVM_Other%POS_BOUND(IDim, N, 1, NST -3, IBlade),  &  
                                                                           O%FVM_Other%POS_BOUND(IDim, N, 1, NST -2, IBlade),        &
                                                                           O%FVM_Other%POS_BOUND(IDim, N, 1, NST -1, IBlade),        &
-                                                                          p%BLADE%RNodes(NST - 3), p%BLADE%RNodes(NST - 2),         &
-                                                                          p%BLADE%RNodes(NST - 1), p%BLADE%RTrail(NST -1) )
+                                                                          p%BLADE_RNodes(NST - 3), p%BLADE_RNodes(NST - 2),         &
+                                                                          p%BLADE_RNodes(NST - 1), p%BLADE_RTrail(NST -1) )
          
          O%FVM_Other%POS_QUARTER(IDim, N, 1, NST, IBlade) = QUADRATIC_INTERP(O%FVM_Other%POS_BOUND(IDim, N, 1, NST -3, IBlade),      &  
                                                                           O%FVM_Other%POS_BOUND(IDim, N, 1, NST -2, IBlade),         &
                                                                           O%FVM_Other%POS_BOUND(IDim, N, 1, NST -1, IBlade),         &
-                                                                          p%BLADE%RNodes(NST - 3), p%BLADE%RNodes(NST - 2),          &
-                                                                          p%BLADE%RNodes(NST - 1), p%BLADE%RTrail(NST) )                  
+                                                                          p%BLADE_RNodes(NST - 3), p%BLADE_RNodes(NST - 2),          &
+                                                                          p%BLADE_RNodes(NST - 1), p%BLADE_RTrail(NST) )                  
       END DO
    END DO         
 
@@ -1725,8 +1734,8 @@ SUBROUTINE WINDS_Kinematics(u, p, O, xd, N, ErrStat, ErrMess)
          O%FVM_Other%POS_TRAIL(IDim, N, 1, 1, IBlade) = QUADRATIC_INTERP(O%FVM_Other%POS_END(IDim, N, 1, 1, IBlade),          &  
                                                                      O%FVM_Other%POS_END(IDim, N, 1, 2, IBlade),              &
                                                                      O%FVM_Other%POS_END(IDim, N, 1, 3, IBlade),              &
-                                                                     p%BLADE%RNodes(1), p%BLADE%RNodes(2), p%BLADE%RNodes(3), &
-                                                                     p%BLADE%RTrail(1))
+                                                                     p%BLADE_RNodes(1), p%BLADE_RNodes(2), p%BLADE_RNodes(3), &
+                                                                     p%BLADE_RTrail(1))
          
 
          DO IElement2 = 2, NST - 2
@@ -1734,23 +1743,23 @@ SUBROUTINE WINDS_Kinematics(u, p, O, xd, N, ErrStat, ErrMess)
                                                           QUADRATIC_INTERP(O%FVM_Other%POS_END(IDim, N, 1, IElement2 -1, IBlade),  &    
                                                                            O%FVM_Other%POS_END(IDim, N, 1, IElement2, IBlade),     &
                                                                            O%FVM_Other%POS_END(IDim, N, 1, IElement2 +1, IBlade),  &
-                                                                           p%BLADE%RNodes(IElement2 -1),                           &
-                                                                           p%BLADE%RNodes(IElement2),                              &
-                                                                           p%BLADE%RNodes(IElement2 +1),                           &
-                                                                           p%BLADE%RTrail(IElement2) )
+                                                                           p%BLADE_RNodes(IElement2 -1),                           &
+                                                                           p%BLADE_RNodes(IElement2),                              &
+                                                                           p%BLADE_RNodes(IElement2 +1),                           &
+                                                                           p%BLADE_RTrail(IElement2) )
          END DO             
              
          O%FVM_Other%POS_TRAIL(IDim, N, 1, NST -1, IBlade) = QUADRATIC_INTERP(O%FVM_Other%POS_END(IDim, N, 1, NST -3, IBlade),  &  
                                                                           O%FVM_Other%POS_END(IDim, N, 1, NST -2, IBlade),      &
                                                                           O%FVM_Other%POS_END(IDim, N, 1, NST -1, IBlade),      &
-                                                                          p%BLADE%RNodes(NST - 3), p%BLADE%RNodes(NST - 2),     &
-                                                                          p%BLADE%RNodes(NST - 1), p%BLADE%RTrail(NST -1) )
+                                                                          p%BLADE_RNodes(NST - 3), p%BLADE_RNodes(NST - 2),     &
+                                                                          p%BLADE_RNodes(NST - 1), p%BLADE_RTrail(NST -1) )
          
          O%FVM_Other%POS_TRAIL(IDim, N, 1, NST, IBlade) = QUADRATIC_INTERP(O%FVM_Other%POS_END(IDim, N, 1, NST -3, IBlade),     &  
                                                                           O%FVM_Other%POS_END(IDim, N, 1, NST -2, IBlade),      &
                                                                           O%FVM_Other%POS_END(IDim, N, 1, NST -1, IBlade),      &
-                                                                          p%BLADE%RNodes(NST - 3), p%BLADE%RNodes(NST - 2),     &
-                                                                          p%BLADE%RNodes(NST - 1), p%BLADE%RTrail(NST) )                  
+                                                                          p%BLADE_RNodes(NST - 3), p%BLADE_RNodes(NST - 2),     &
+                                                                          p%BLADE_RNodes(NST - 1), p%BLADE_RTrail(NST) )                  
       END DO
    END DO     
    
@@ -2149,7 +2158,7 @@ SUBROUTINE WINDS_FVMInitial(u, p, O, xd, ErrStat, ErrMess, x, z, y)
             ! Use Kutta-Joukowski theorem to define bound circulation strength         
    DO IBlade = 1, NB     
       DO IElement = 1, NS   
-         O%FVM_Other%WAKE_GAMMA_SHED(1, 1, 1, IElement, IBlade) = 0.5 * O%FVM_Other%WIND_INFTYM(1,1,1,1,1) * p%Blade%C(IElement) *     &
+         O%FVM_Other%WAKE_GAMMA_SHED(1, 1, 1, IElement, IBlade) = 0.5 * O%FVM_Other%WIND_INFTYM(1,1,1,1,1) * p%BLADE_C(IElement) *     &
                                                                     O%FVM_Other%PERF_CL(1, 1, 1, IElement, 1)     
      
       END DO !IElement
@@ -2390,7 +2399,7 @@ SUBROUTINE Aero_Loads(u, p, xd, O, ErrStat, ErrMess)
          
          W2 = O%FVM_Other%KJ%VEL_TOT(1, N, 1, IElement, IBLADE) **2  + O%FVM_Other%KJ%VEL_TOT(2, N, 1, IElement, IBLADE) **2
                   
-         QA       = 0.5 * P%Wind%RHO * W2 * P%Blade%C(IElement) ! sliu: do not mutiply P%Blade%DR(IElement) here and do not divide it in Forces (protential bug in AeroDyn)...
+         QA       = 0.5 * P%Wind%RHO * W2 * P%BLADE_C(IElement) ! sliu: do not mutiply P%BLADE_DR(IElement) here and do not divide it in Forces (protential bug in AeroDyn)...
 
          CPHI     = COS( PHI )
          SPHI     = SIN( PHI )
@@ -2398,7 +2407,7 @@ SUBROUTINE Aero_Loads(u, p, xd, O, ErrStat, ErrMess)
          DFT      = ( CLA * SPHI - CDA * CPHI ) * QA
 
          IF ( P%PMOMENT ) THEN
-            PMA  = CMA * QA * P%Blade%C(IElement)
+            PMA  = CMA * QA * P%BLADE_C(IElement)
          ELSE
             PMA  = 0.0_DbKi
             CMA  = 0.0_DbKi
@@ -3825,42 +3834,42 @@ CONTAINS
 
                   
         ! Find coef. of lift and drag 
-      IF (O%WINDS_Timestep > p%FVM%DS_Parms%start_n  .AND.  p%FVM%DS_Parms%DS_Flag ) THEN
-          ! Call Leishman-Beddoes dynamic stall model
-         DO IBlade = 1, NB   
-            DO IElement = 1, NS
-               Check_name =  INDEX((p%AirFoil%FOILNM(P%AirFoil%NFOIL(IElement))), "Cylinder")    
-               IF (Check_name == 0) THEN ! Not "Cylinder"
-                  CALL LB_DynStall(p, O, xd, Iiter, ErrStat, ErrMess, IElement, IBlade, CLA, CDA, CMA, P%AirFoil%NFOIL(IElement))                         
-               ELSE  ! "Cylinder"
-                   CALL CLCD_FVM(p, O, xd, ErrStat, ErrMess, O%FVM_Other%KJ%AOA(1, 1, 1, IElement, IBlade), CLA, CDA, CMA, & 
-                                 P%AirFoil%NFOIL(IElement))    
-               END IF   
-               
-               IF ( ErrStat /= ErrID_None )  THEN      
-                  ErrMess = ' Error (in WInDS): Error occured when finding Cl in Kutta-Joukowski/LB_DynStall subroutine. Please check.'      
-                  RETURN      
-               END IF 
-               
-               IF ( ISNAN(CLA) )  THEN
-                  ErrStat =  ErrID_Fatal
-                  ErrMess = ' Error (in WInDS): Cl is Nan in Kutta-Joukowski/LB_DynStall subroutine. Please check.'   
-                  RETURN      
-               END IF 
-               
-               IF ( ISNAN(CDA) )  THEN
-                  ErrStat =  ErrID_Fatal
-                  ErrMess = ' Error (in WInDS): Cd is Nan in Kutta-Joukowski/LB_DynStall subroutine. Please check.'      
-                  RETURN      
-               END IF
-
-               O%FVM_Other%KJ%CL(1,1,1,IElement,IBlade) = CLA
-               O%FVM_Other%KJ%CD(1,1,1,IElement,IBlade) = CDA    
-               O%FVM_Other%KJ%CM(1,1,1,IElement,IBlade) = CMA 
-            END DO
-         END DO    
-          
-      ELSE
+      !IF (O%WINDS_Timestep > p%FVM%DS_Parms%start_n  .AND.  p%FVM%DS_Parms%DS_Flag ) THEN
+      !    ! Call Leishman-Beddoes dynamic stall model
+      !   DO IBlade = 1, NB   
+      !      DO IElement = 1, NS
+      !         Check_name =  INDEX((p%AirFoil%FOILNM(P%AirFoil%NFOIL(IElement))), "Cylinder")    
+      !         IF (Check_name == 0) THEN ! Not "Cylinder"
+      !            CALL LB_DynStall(p, O, xd, Iiter, ErrStat, ErrMess, IElement, IBlade, CLA, CDA, CMA, P%AirFoil%NFOIL(IElement))                         
+      !         ELSE  ! "Cylinder"
+      !             CALL CLCD_FVM(p, O, xd, ErrStat, ErrMess, O%FVM_Other%KJ%AOA(1, 1, 1, IElement, IBlade), CLA, CDA, CMA, & 
+      !                           P%AirFoil%NFOIL(IElement))    
+      !         END IF   
+      !         
+      !         IF ( ErrStat /= ErrID_None )  THEN      
+      !            ErrMess = ' Error (in WInDS): Error occured when finding Cl in Kutta-Joukowski/LB_DynStall subroutine. Please check.'      
+      !            RETURN      
+      !         END IF 
+      !         
+      !         IF ( ISNAN(CLA) )  THEN
+      !            ErrStat =  ErrID_Fatal
+      !            ErrMess = ' Error (in WInDS): Cl is Nan in Kutta-Joukowski/LB_DynStall subroutine. Please check.'   
+      !            RETURN      
+      !         END IF 
+      !         
+      !         IF ( ISNAN(CDA) )  THEN
+      !            ErrStat =  ErrID_Fatal
+      !            ErrMess = ' Error (in WInDS): Cd is Nan in Kutta-Joukowski/LB_DynStall subroutine. Please check.'      
+      !            RETURN      
+      !         END IF
+      !
+      !         O%FVM_Other%KJ%CL(1,1,1,IElement,IBlade) = CLA
+      !         O%FVM_Other%KJ%CD(1,1,1,IElement,IBlade) = CDA    
+      !         O%FVM_Other%KJ%CM(1,1,1,IElement,IBlade) = CMA 
+      !      END DO
+      !   END DO    
+      !    
+      !ELSE
             ! Interpolate over airfoil data tables    ! ~ SUBROUTINE CLCD in AeroSubs.f90         
          DO IBlade = 1, NB   
             DO IElement = 1, NS
@@ -3878,7 +3887,7 @@ CONTAINS
                O%FVM_Other%KJ%CM(1,1,1,IElement,IBlade) = CMA 
             END DO
          END DO
-      END IF ! (O%WINDS_Timestep > p%FVM%DS_Parms%start_n  .AND.  p%FVM%DS_Parms%DS_Flag )   
+      !END IF ! (O%WINDS_Timestep > p%FVM%DS_Parms%start_n  .AND.  p%FVM%DS_Parms%DS_Flag )   
          
  
         ! Compute bound vorticity via Kutta-Joukowski theorem
@@ -3887,7 +3896,7 @@ CONTAINS
       DO IBlade = 1, NB           
          DO IElement = 1, NS
             O%FVM_Other%KJ%GAMMA1(1, 1, 1, IElement, IBlade) = 0.5 * O%FVM_Other%KJ%Vinf(1, 1, 1, IElement, IBlade) *    &
-                                                         p%Blade%C(IElement) *  O%FVM_Other%KJ%CL(1, 1, 1, IElement, IBlade)
+                                                         p%BLADE_C(IElement) *  O%FVM_Other%KJ%CL(1, 1, 1, IElement, IBlade)
          END DO
       END DO         
         
@@ -4671,8 +4680,8 @@ SUBROUTINE VCORE(p, O, xd, N, ErrStat, ErrMess)
       
 
       ! Define initial vortex core size       (sliu: this part should be moved to initials.m)
-   O%FVM_Other%TipSpdRat = p%Blade%R * O%Rotor%REVS / O%FVM_Other%WIND_INFTYM(1,1,1,1,1)    ! REVS: Rotor rotational speed (i.e. RPM in rad/sec)
-   T0 = TwoPi * p%Blade%TipRadius /(12 * O%FVM_Other%TipSpdRat * O%FVM_Other%WIND_INFTYM(1,1,1,1,1)) 
+   O%FVM_Other%TipSpdRat = p%BLADE_R * O%Rotor%REVS / O%FVM_Other%WIND_INFTYM(1,1,1,1,1)    ! REVS: Rotor rotational speed (i.e. RPM in rad/sec)
+   T0 = TwoPi * p%BLADE_TipRadius /(12 * O%FVM_Other%TipSpdRat * O%FVM_Other%WIND_INFTYM(1,1,1,1,1)) 
    
    O%FVM_Other%WAKE_R0(1) = SQRT(4 * p%FVM%RL_Model%ALPHA  * p%FVM%RL_Model%NU * p%FVM%RL_Model%DELTA * T0)   
 
@@ -4971,8 +4980,8 @@ SUBROUTINE BEM(u, p, xd, O, ErrStat, ErrMess)
          VNWind    =     DOT_PRODUCT( tmpVector, VelocityVec )                                                        ! Component normal to the plane of rotation of wind velocity alone
          VNElement = -1.*DOT_PRODUCT( tmpVector, u%InputMarkers(IBlade)%TranslationVel(:,IElement ) )                 ! Component normal to the plane of rotation of deflection translational velocity alone      
           
-         LAMBDAR =  p%BLADE%RNodes(IElement) * O%Rotor%REVS / O%FVM_Other%WIND_INFTYM(1, 1, 1, 1, 1)                  ! Local speed ratio
-         SIGMAP  =  p%numBlades * P%Blade%C(IElement) / ( TWOPI * p%BLADE%RNodes(IElement))                            ! Local solidity  
+         LAMBDAR =  p%BLADE_RNodes(IElement) * O%Rotor%REVS / O%FVM_Other%WIND_INFTYM(1, 1, 1, 1, 1)                  ! Local speed ratio
+         SIGMAP  =  p%numBlades * P%BLADE_C(IElement) / ( TWOPI * p%BLADE_RNodes(IElement))                            ! Local solidity  
          TWST    =  - P%Element%TWIST(IElement) 
          PTCH    =  o%Element%PitNow 
 
@@ -5001,21 +5010,21 @@ SUBROUTINE BEM(u, p, xd, O, ErrStat, ErrMess)
             O%FVM_Other%PERF_AOA(1, 1, 1, IElement, IBlade)   =  ALPHA            
             
             
-            QA       = 0.5 * P%Wind%RHO * W2 * P%Blade%DR(IElement) * P%Blade%C(IElement)
+            QA       = 0.5 * P%Wind%RHO * W2 * P%BLADE_DR(IElement) * P%BLADE_C(IElement)
             CPHI     = COS( PHI )
             SPHI     = SIN( PHI )
             DFN      = ( CLA * CPHI + CDA * SPHI ) * QA
             DFT      = ( CLA * SPHI - CDA * CPHI ) * QA
 
-            PMA  = CMA * QA * P%Blade%C(IElement)    
+            PMA  = CMA * QA * P%BLADE_C(IElement)    
          
-            O%FVM_Other%StoredForces(1, 1, 1, IElement, IBlade)   = ( DFN*CPitch + DFT*SPitch ) / p%Blade%DR(IElement)
-            O%FVM_Other%StoredForces(2, 1, 1, IElement, IBlade)   = ( DFN*SPitch - DFT*CPitch ) / p%Blade%DR(IElement)
+            O%FVM_Other%StoredForces(1, 1, 1, IElement, IBlade)   = ( DFN*CPitch + DFT*SPitch ) / p%BLADE_DR(IElement)
+            O%FVM_Other%StoredForces(2, 1, 1, IElement, IBlade)   = ( DFN*SPitch - DFT*CPitch ) / p%BLADE_DR(IElement)
             O%FVM_Other%StoredForces(3, 1, 1, IElement, IBlade)   = 0.0
 
             O%FVM_Other%StoredMoments(1, 1, 1, IElement, IBlade)  = 0.0
             O%FVM_Other%StoredMoments(2, 1, 1, IElement, IBlade)  = 0.0
-            O%FVM_Other%StoredMoments(3, 1, 1, IElement, IBlade)  = PMA / p%Blade%DR(IElement)                 
+            O%FVM_Other%StoredMoments(3, 1, 1, IElement, IBlade)  = PMA / p%BLADE_DR(IElement)                 
          END DO !IBlade         
          
       END DO !IElement 
@@ -5098,8 +5107,8 @@ CONTAINS
             
             
       ! Compute loss correction factor due to tip and hub losses       
-      TIPLOSS = 2 / Pi * ACOS(EXP(-(p%numBlades * (p%Blade%TipRadius - p%BLADE%RNodes(J)) / (2 * p%BLADE%RNodes(J) * SPHI))))      
-      HUBLOSS = 2 / Pi * ACOS(EXP(-(p%numBlades * (p%BLADE%RNodes(J) - p%Blade%HubRadius) / (2 * p%Blade%HubRadius * SPHI))))           
+      TIPLOSS = 2 / Pi * ACOS(EXP(-(p%numBlades * (InitInp%zTip  (j) - p%BLADE_RNodes(J)) / (2 * p%BLADE_RNodes(J) * SPHI))))      
+      HUBLOSS = 2 / Pi * ACOS(EXP(-(p%numBlades * (p%BLADE_RNodes(J) - InitInp%zHub  (j)) / (2 * InitInp%zHub  (j) * SPHI))))           
       LOSS    = TIPLOSS * HUBLOSS       
             
             
