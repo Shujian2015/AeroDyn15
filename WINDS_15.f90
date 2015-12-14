@@ -5,43 +5,46 @@
 ! The work is based on the WInDS (Matlab code) by Dr.Thomas Sebastian, updated by Dr.Matthew Lackner, Nathaniel DeVelder, Evan Gaertner, David Lenz and Andrew Sciotti.
 !
 ! REFERENCES:
-! 1. Sebastian, Thomas, "The Aerodynamics and Near Wake of an Offshore Floating Horizontal Axis Wind Turbine" (2012). Dissertations. Paper 516.
-! 2. deVelder, Nathaniel B., "Free Wake Potential Flow Vortex Wind Turbine Modeling: Advances in Parallel Processing and Integration of Ground Effects". 
-!    Masters Theses 1896 - February 2014. Paper 1176.
-! 3. Gaertner, Evan M., "Modeling Dynamic Stall for a Free Vortex Wake Model of a Floating Offshore Wind Turbine". Masters Theses - September 2014.
-! 4. Sebastian, T., and M. A. Lackner. "Development of a free vortex wake method code for offshore floating wind turbines." 
-!    Renewable Energy 46 (2012): 269-275.
-! 5. Sebastian, T., and M. A. Lackner. "Characterization of the unsteady aerodynamics of offshore floating wind turbines." 
-!    Wind Energy 16.3 (2013): 339-352.
-! 6. Sebastian, Thomas, and Matthew Lackner. "Analysis of the Induction and Wake Evolution of an Offshore Floating Wind Turbine." 
-!    Energies (19961073) 5.4 (2012).
-! 7. Lackner, Matthew A., Nathaniel deVelder, and Thomas Sebastian. "On 2D and 3D potential flow models of upwind wind turbine tower interference." 
-!    Computers & Fluids 71 (2013): 375-379.
-! 8. David Lenz. Implementation Cutoff & Freeze.
-! 9. Jonkman, B., et al. "NWTC Programmer’s Handbook: A Guide for Software Development Within the FAST Computer-Aided Engineering Tool." 
-!    NREL/TP-Draft Version, Golden, CO: National Renewable Energy Laboratory (2012).
-! 10. Algorithmic Outline of Unsteady Aerodynamics (AERODYN) Modules. Project WE-201103. FINAL REPORT. September 2, 2011.
+!    UMass WEC:
+!        1. Sebastian, Thomas, "The Aerodynamics and Near Wake of an Offshore Floating Horizontal Axis Wind Turbine" (2012). Dissertations. Paper 516.
+!        2. deVelder, Nathaniel B., "Free Wake Potential Flow Vortex Wind Turbine Modeling: Advances in Parallel Processing and Integration of Ground Effects". 
+!           Masters Theses 1896 - February 2014. Paper 1176.
+!        3. Gaertner, Evan M., "Modeling Dynamic Stall for a Free Vortex Wake Model of a Floating Offshore Wind Turbine". Masters Theses - September 2014.
+!        4. Sebastian, T., and M. A. Lackner. "Development of a free vortex wake method code for offshore floating wind turbines." 
+!           Renewable Energy 46 (2012): 269-275.
+!        5. Sebastian, T., and M. A. Lackner. "Characterization of the unsteady aerodynamics of offshore floating wind turbines." 
+!           Wind Energy 16.3 (2013): 339-352.
+!        6. Sebastian, Thomas, and Matthew Lackner. "Analysis of the Induction and Wake Evolution of an Offshore Floating Wind Turbine." 
+!           Energies (19961073) 5.4 (2012).
+!        7. Lackner, Matthew A., Nathaniel deVelder, and Thomas Sebastian. "On 2D and 3D potential flow models of upwind wind turbine tower interference." 
+!           Computers & Fluids 71 (2013): 375-379.
+!        8. David Lenz. Implementation Cutoff & Freeze.
 !
+!    NREL:
+!        9. Jonkman, B., et al. "NWTC Programmer's Handbook: A Guide for Software Development Within the FAST Computer-Aided Engineering Tool." 
+!           NREL/TP-Draft Version, Golden, CO: National Renewable Energy Laboratory (2012).
+!        10. Algorithmic Outline of Unsteady Aerodynamics (AERODYN) Modules. Project WE-201103. FINAL REPORT. September 2, 2011.
+!        11. AeroDyn v15 User¡¯s Guide and Theory Manual https://wind.nrel.gov/nwtc/docs/AeroDyn_Manual.pdf
 !.................................................................................................................................
 !
 ! Fortran code is written by Shujian Liu (shujian.liu@hotmail.com)
 !
-! Last edited Aug 6, 2015
+! Last edited Dec 14, 2015
 !==================================================================================================================================
 ! A few notes:
 !   1) Data type: 5D array -> (Dimension index(1~3), Time index(1~nt), Timestep stored(1~nt_p),  Radial index(1~ns/nst), Blade index(1~nb))
 !   2) Angles are in radian, not degree.
 !==================================================================================================================================
 
-MODULE WINDS
+MODULE WINDS_15
 
    USE NWTC_Library 
    USE AeroDyn_Types
-   USE WINDS_IO          ! Handle input and output
-   USE WINDS_Accelerate  ! Acceleration of Biot-Savart Law 
-   ! USE WINDS_DS          ! LB Dynamic stall
-   USE WINDS_Library     ! Some subroutines for debug
-   USE WINDS_Treecode    ! Treecode algorithm to speedup 
+   USE WINDS_IO_15          ! Handle input and output
+   USE WINDS_Accelerate_15  ! Acceleration of Biot-Savart Law 
+   !USE WINDS_DS_15         ! LB Dynamic stall
+   USE WINDS_Library_15     ! Some subroutines for debug
+   USE WINDS_Treecode_15    ! Treecode algorithm to speedup 
    
 
    
@@ -50,7 +53,6 @@ MODULE WINDS
       ! ..... Public Subroutines ............
    public :: WINDS_Init                           ! Initialization routine
    public :: WINDS_End                            ! Ending routine (includes clean up)
-
    public :: WINDS_UpdateStates                   ! Loose coupling routine for solving for constraint states, integrating
                                                !   continuous states, and updating discrete states
    public :: WINDS_CalcOutput                     ! Routine for computing outputs
@@ -60,24 +62,585 @@ MODULE WINDS
    public :: WINDS_UpdateDiscState                ! Tight coupling routine for updating discrete states
    
    
-   !PUBLIC :: WINDS_SetParameters   ! Set the parameters of WInDS(FVM) module
-   !PUBLIC :: WINDS_Allocate        ! Allocate necessary memory for the WInDS(FVM) module
-   !PUBLIC :: WINDS_Kinematics      ! Computes the station locations of each blade in the inertial coordinate system
-   !PUBLIC :: WINDS_Velocity        ! Computes the velocity contributions due to turbine and platform motions and freestream flow in the inertial and blade coordinate systems.
-   !PUBLIC :: WINDS_FVMInitial      ! Calculate aerodynamic loads of the first timestep by BEM
-   !PUBLIC :: WINDS_FVM             ! Use free vortex wake method to calculate the aerodynamic loads after first timestep
-   
 
 
 CONTAINS
     
     
-    
-    
-    
-    
 !==================================================================================================================================
-SUBROUTINE WINDS_SetParameters( InitInp, p, O, ErrStat, ErrMess )
+SUBROUTINE WINDS_Init(InputFileData, u_AD, u, p, x, xd, z, O, y, ErrStat, ErrMess)
+
+   type(AD_InputFile),          intent(in   ) :: InputFileData  ! All the data in the AeroDyn input file
+   type(AD_InputType),          intent(in   ) :: u_AD           ! AD inputs - used for input mesh node positions
+   type(AD_InputType),          intent(  out) :: u              ! An initial guess for the input; input mesh must be defined
+   type(AD_ParameterType),      intent(inout) :: p              ! Parameters ! intent out b/c we set the WINDS parameters here
+   type(AD_ContinuousStateType),intent(  out) :: x              ! Initial continuous states
+   type(AD_DiscreteStateType),  intent(  out) :: xd             ! Initial discrete states
+   type(AD_ConstraintStateType),intent(  out) :: z              ! Initial guess of the constraint states
+   type(AD_OtherStateType),     intent(  out) :: O     ! Initial other/optimization states
+   type(AD_OutputType),         intent(  out) :: y              ! Initial system outputs (outputs are not calculated;
+                                                                   !   only the output mesh is initialized)
+   integer(IntKi),              intent(  out) :: errStat        ! Error status of the operation
+   character(*),                intent(  out) :: errMess         ! Error message if ErrStat /= ErrID_None
+
+
+   
+   
+   ! Local parameters.
+   !.................................................................
+   ! Umass WInDS.....................................................
+   ! Get the current time
+   CALL DATE_AND_TIME ( Values=O%FVM_Other%StrtTime )                        ! Let's time the whole simulation
+   CALL CPU_TIME ( O%FVM_Other%UsrTime1 )                                    ! Initial time (this zeros the start time when used as a MATLAB function)
+   O%FVM_Other%UsrTime1 = MAX( 0.0_DbKi, O%FVM_Other%UsrTime1 )                   ! CPU_TIME: If a meaningful time cannot be returned, a processor-dependent negative value is returned
+   ! Umass WInDS....................................................
+   !.................................................................   
+      
+   
+   
+    ! Basic parameters.
+   p%FVM%UseWINDS         =    .TRUE.            ! whether to use WINDS
+   O%Aerodyn_Timestep     =    0                ! The timestep used in FAST and AeroDyn (Same as n_t_global in FAST_Prog.f90)
+   O%WINDS_Timestep       =    1                 ! The timestep in  WINDS,  (O%WINDS_Timestep - 1) * Dt_Ratio - 1 = O%Aerodyn_Timestep
+
+  
+   O%FVM_Other%TIME%Time_Total  = 0.0            ! Total time of WINDS
+   O%FVM_Other%TIME%Time_biotsavart  = 0.0       ! Total time of Inducevelocity subroutine
+   O%FVM_Other%TIME%Time_biotsavart_Acce  = 0.0 ! Total time of biotsavart subroutine
+   
+
+
+   ! Read input file
+   CALL ReadInputWInDS(P, xd, O, ErrStat, ErrMess )
+   IF (ErrStat /= 0 ) RETURN
+
+      ! Set parameters
+   CALL WINDS_SetParameters( u_AD, InputFileData, p, O, ErrStat, ErrMess )
+   IF (ErrStat /= 0 ) RETURN
+   
+     ! Allocate valuables
+   CALL WINDS_Allocate( p, O, xd, ErrStat, ErrMess )
+   IF (ErrStat /= 0 ) RETURN
+   
+     ! Wind shear 
+   IF (p%FVM%Shear_Parms%ShearFLAG ) THEN
+      CALL WINDS_Shear_Model(p, O, ErrStat, ErrMess)
+      IF (ErrStat /= 0 ) RETURN
+   END IF
+         
+     ! Ground effects
+   IF (p%FVM%Ground_Parms%GroundFLAG  .AND.  p%FVM%Ground_Parms%METHOD == 'PANEL') THEN
+      CALL WINDS_Ground_model(p, O, ErrStat, ErrMess)
+      IF (ErrStat /= 0 ) RETURN
+   END IF   
+      
+   ! Calculate varibles for LB dynamic stall
+   !IF (p%FVM%DS_Parms%DS_Flag) THEN
+   !    
+   !   ! sliu: do not load data any more .. 
+   !   IF (p%FVM%DS_Parms%load_data) THEN 
+   !      CALL LB_load_AirfoilData(p, O, xd, ErrStat, ErrMess) 
+   !   ELSE
+   !      CALL LB_Initialize_AirfoilData(p, O, xd, ErrStat, ErrMess)
+   !   END IF      
+   !   p%FVM%DS_Parms%start_n = FLOOR( p%FVM%DS_Parms%start_t / p%FVM%DT_WINDS + 1 )
+   !   ! Write these variables into txt file for debug purpose
+   !   IF (p%FVM%DS_Parms%write_data) THEN
+   !      CALL Write_DS_parameters(p, O, ErrStat, ErrMess)
+   !   END IF
+   !   IF ( ErrStat /= 0 )  RETURN   
+   !ELSE 
+      p%FVM%DS_Parms%start_n = p%FVM%NT + 1   !            
+   !END IF      
+   
+      ! Initialize paraview animation files (.pvd) 
+   IF (p%FVM%AnimFLAG) THEN
+      CALL Initialize_paraview_files(P, xd, O, ErrStat, ErrMess )
+      IF (ErrStat /= 0 ) RETURN
+   END IF
+   
+       ! Record the speedup and error of N-body algorithm or parallel computation
+   IF (p%FVM%Tree_Parms%Speedup) THEN   
+       CALL WRITE_Treecode(0_IntKi, 0_IntKi, 0.0_DbKi,  0.0_DbKi, 0.0_DbKi, 0.0_DbKi, 'START', p)
+   END IF
+   
+      ! Record the iteration number of KJ
+   IF (p%FVM%KJ_output) THEN
+      CALL WRITE_KJ(0_IntKi, 0_IntKi, 0.0_DbKi,  'START', p)
+   END IF   
+   
+
+
+    
+END SUBROUTINE WINDS_Init
+!==================================================================================================================================
+SUBROUTINE WINDS_End( u, p, x, xd, z, OtherState, y, ErrStat, ErrMess )
+
+   type(AD_InputType),          intent(  out) :: u              ! An initial guess for the input; input mesh must be defined
+   type(AD_ParameterType),      intent(inout) :: p              ! Parameters ! intent out b/c we set the WINDS parameters here
+   type(AD_ContinuousStateType),intent(  out) :: x              ! Initial continuous states
+   type(AD_DiscreteStateType),  intent(  out) :: xd             ! Initial discrete states
+   type(AD_ConstraintStateType),intent(  out) :: z              ! Initial guess of the constraint states
+   type(AD_OtherStateType),     intent(  out) :: OtherState     ! Initial other/optimization states
+   type(AD_OutputType),         intent(  out) :: y              ! Initial system outputs (outputs are not calculated;
+                                                                   !   only the output mesh is initialized)
+   integer(IntKi),              intent(  out) :: errStat        ! Error status of the operation
+   character(*),                intent(  out) :: errMess         ! Error message if ErrStat /= ErrID_None
+
+
+
+         ! Close the Paraview input file
+      IF (p%FVM%AnimFLAG) THEN
+         CALL Close_paraview_files(P, xd, OtherState, ErrStat, ErrMess )
+         IF (ErrStat /= 0 ) RETURN
+      END IF
+      
+         ! Record the speedup and error of N-body algorithm or parallel computation
+      IF (p%FVM%Tree_Parms%Speedup) THEN   
+          CALL WRITE_Treecode(0_IntKi, 0_IntKi, 0.0_DbKi,  0.0_DbKi, 0.0_DbKi, 0.0_DbKi, 'END', p)
+      END IF
+      
+      ! Record the iteration number of KJ
+      IF (p%FVM%KJ_output) THEN
+         CALL WRITE_KJ(0_IntKi, 0_IntKi, 0.0_DbKi, 'END', p)
+      END IF 
+      
+      ! Summary file
+      IF (p%FVM%WINDS_Sum) THEN      
+         CALL WInDS_WriteSum(P, xd, OtherState, ErrStat, ErrMess )
+      END IF 
+
+
+END SUBROUTINE WINDS_End
+!==================================================================================================================================
+SUBROUTINE WINDS_CalcOutput( time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
+
+   real(DbKi),                   intent(in   )  :: time           ! Current simulation time in seconds
+   type(AD_InputType),           intent(in   )  :: u           ! Inputs at Time t
+   type(AD_ParameterType),       intent(in   )  :: p           ! Parameters
+   type(AD_ContinuousStateType), intent(in   )  :: x           ! Continuous states at t
+   type(AD_DiscreteStateType),   intent(in   )  :: xd          ! Discrete states at t
+   type(AD_ConstraintStateType), intent(in   )  :: z           ! Constraint states at t
+   type(AD_OtherStateType),      intent(inout)  :: O!therState  ! Other/optimization states
+   type(AD_OutputType),          intent(inout)  :: y           ! Outputs computed at t (Input only so that mesh con-
+                                                                 !   nectivity information does not have to be recalculated)
+   integer(IntKi),                 intent(  out)  :: errStat     ! Error status of the operation
+   character(*),                   intent(  out)  :: errMess      ! Error message if ErrStat /= ErrID_None
+
+   
+  ! Local variables
+   
+   INTEGER                    :: IBlade
+   INTEGER                    :: IElement
+   !!.....................................................
+   !! Umass WINDS
+   !REAL(DbKi)          :: Time_1  ! To record CPU time(Start time) 
+   !REAL(DbKi)          :: Time_2  ! To record CPU time(End time)  
+   !! Umass WINDS    
+   !!.....................................................   
+   
+   !..................................... ...............     
+   ! umass debug, to be deleted
+   REAL(DbKi), DIMENSION(p%NumBlNds, p%numBlades)           :: PRINT_NAME1
+   REAL(DbKi), DIMENSION(p%NumBlNds+1, p%numBlades)         :: PRINT_NAME2
+   REAL(DbKi), DIMENSION(p%NumBlNds, 3)                     :: PRINT_NAME3   
+   
+   INTEGER(IntKi)      :: IDim        ! For dimensions
+   INTEGER(IntKi)      :: ITimestep   ! For timesteps
+   
+   INTEGER(IntKi)      :: NST 
+   INTEGER(IntKi)      :: NS
+   INTEGER(IntKi)      :: NT 
+   INTEGER(IntKi)      :: NB 
+   
+   
+   CHARACTER(LEN=2), DIMENSION(20)      :: Rank_num
+   CHARACTER(LEN=1024)                  :: temp_number
+   CHARACTER(LEN=1)                     :: temp_1 
+   CHARACTER(LEN=2)                     :: temp_2 
+   CHARACTER(LEN=3)                     :: temp_3 
+      
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
+   NT  = p%FVM%NT
+   NB  = p%numBlades    
+   ! umass debug, to be deleted
+   !....................................................           
+
+   
+   
+   
+      ! Get the inflow wind speed         
+   DO IBlade = 1, NB
+      DO IElement = 1, NS   
+         IF (O%Aerodyn_Timestep == 1) THEN 
+            O%FVM_Other%WIND_INFTY(1, 1, 1, IElement, IBlade) = O%V_diskAvg(1)   
+            O%FVM_Other%WIND_INFTY(2, 1, 1, IElement, IBlade) = O%V_diskAvg(2) 
+            O%FVM_Other%WIND_INFTY(3, 1, 1, IElement, IBlade) = O%V_diskAvg(3)    
+         
+            O%FVM_Other%WIND_INFTYM(1, 1, 1, IElement, IBlade) = SQRT(O%V_diskAvg(1)**2 + O%V_diskAvg(2)**2 + O%V_diskAvg(3)**2 )    
+         END IF 
+      END DO
+   END DO
+   
+         
+   
+
+   !
+   ! The WINDS main part:
+   !------------------------------------     
+      
+   IF ( p%FVM%UseWINDS ) THEN  
+      O%FVM_Other%ZTime = time  ! The current simulation time (actual or time of prediction)
+      !........................................................
+      ! The first timestep
+         
+      IF ( O%Aerodyn_Timestep == 1 )  THEN
+
+             ! Start time
+            CALL DATE_AND_TIME ( Values=O%FVM_Other%SimStrtTime )
+            CALL CPU_TIME ( O%FVM_Other%UsrTime2 )                                                    ! Initial CPU time   
+            O%FVM_Other%UsrTime2 = MAX( 0.0_DbKi, O%FVM_Other%UsrTime2 )  ! CPU_TIME: If a meaningful time cannot be returned, a processor-dependent negative value is returned
+            
+               ! Calculate positions and velocity of blades   
+            CALL WINDS_Kinematics(u, p, O, xd, O%WINDS_Timestep, ErrStat, ErrMess)
+            IF (ErrStat /= 0 ) RETURN
+            
+            CALL WINDS_Velocity(u, p, O, xd, O%WINDS_Timestep, ErrStat, ErrMess)    
+            IF (ErrStat /= 0 ) RETURN
+            
+            CALL WINDS_FVMInitial(u, p, O, xd, ErrStat, ErrMess, x, z, y)   !  "initials" in WInDS            
+            IF (ErrStat /= 0 ) RETURN
+            
+            DO IBlade=1, p%numBlades
+               DO IElement=1, p%NumBlNds
+                  y%BladeLoad(IBlade)%Force(1,IElement)  = O%FVM_Other%StoredForces(1, 1, 1, IElement, IBlade)   
+                  y%BladeLoad(IBlade)%Force(2,IElement)  = O%FVM_Other%StoredForces(2, 1, 1, IElement, IBlade)   
+                  y%BladeLoad(IBlade)%Force(3,IElement)  = O%FVM_Other%StoredForces(3, 1, 1, IElement, IBlade)   
+                  y%BladeLoad(IBlade)%Moment(1,IElement) = O%FVM_Other%StoredMoments(1, 1, 1, IElement, IBlade)
+                  y%BladeLoad(IBlade)%Moment(2,IElement) = O%FVM_Other%StoredMoments(2, 1, 1, IElement, IBlade)
+                  y%BladeLoad(IBlade)%Moment(3,IElement) = O%FVM_Other%StoredMoments(3, 1, 1, IElement, IBlade)                      
+                   
+                   
+                  O%FVM_Other%PreviousForces(1, 1, 1, IElement, IBlade)  = O%FVM_Other%StoredForces(1, 1, 1, IElement, IBlade)
+                  O%FVM_Other%PreviousForces(2, 1, 1, IElement, IBlade)  = O%FVM_Other%StoredForces(2, 1, 1, IElement, IBlade)
+                  O%FVM_Other%PreviousForces(3, 1, 1, IElement, IBlade)  = O%FVM_Other%StoredForces(3, 1, 1, IElement, IBlade)
+                  O%FVM_Other%PreviousMoments(1, 1, 1, IElement, IBlade) = O%FVM_Other%StoredMoments(1, 1, 1, IElement, IBlade)
+                  O%FVM_Other%PreviousMoments(2, 1, 1, IElement, IBlade) = O%FVM_Other%StoredMoments(2, 1, 1, IElement, IBlade)
+                  O%FVM_Other%PreviousMoments(3, 1, 1, IElement, IBlade) = O%FVM_Other%StoredMoments(3, 1, 1, IElement, IBlade)                               
+               ENDDO
+            ENDDO              
+                       !................................................. sliu: should make a subroutine for this 
+                       ! Debug option to ouput blade element data.
+                       IF (p%FVM%element_output) THEN                          
+                           ! umass debug.......................................
+                           PRINT_NAME1 = 0.0
+                           WRITE (temp_number, "(I6.6)") (1)    ! String of the integer With heading zeros
+                           
+                           ! CL
+                           DO IElement = 1, NS
+                               DO IBlade =  1,NB
+                                  PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_CL(1, 1, 1, IElement, IBlade) 
+                               END DO    
+                           END DO    
+                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_cl_'// TRIM(temp_number))
+                           
+                           ! CD
+                           PRINT_NAME1 = 0.0
+                           DO IElement = 1, NS
+                               DO IBlade =  1,NB
+                                  PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_CD(1, 1, 1, IElement, IBlade) 
+                               END DO    
+                           END DO    
+                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_cd_'// TRIM(temp_number))   
+                           
+                           ! AOA
+                           PRINT_NAME1 = 0.0
+                           DO IElement = 1, NS
+                               DO IBlade =  1,NB
+                                  PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_AOA(1, 1, 1, IElement, IBlade) 
+                               END DO    
+                           END DO    
+                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_aoa_'// TRIM(temp_number))  
+                           
+                           !V_tot                           
+                           DO IBlade =  1,NB
+                              WRITE (temp_1, "(I1)") (IBlade)    ! String of the integer With heading zeros 
+                              PRINT_NAME3 = 0.0
+                              DO IElement = 1, NS
+                                  DO IDim =  1,3
+                                     PRINT_NAME3(IElement, IDIM) = O%FVM_Other%KJ%VEL_TOT(IDIM, 1, 1, IElement, IBlade) 
+                                  END DO    
+                              END DO    
+                              CALL SAVE_TO_TXT_2D(p, PRINT_NAME3 , 'WINDS_vtot_'//temp_1//'_blade_'// TRIM(temp_number)) 
+                           END DO                            
+                          ! umass debug.......................................
+                        end if  
+            
+
+            ! ! End time
+            !CALL CPU_TIME(Time_2) 
+            !O%FVM_Other%TIME%Time_Total = O%FVM_Other%TIME%Time_Total + Time_2 - Time_1  
+              
+            O%WINDS_Timestep =O%WINDS_Timestep + 1      ! WInDS internal timestep, which is 1 ,2, 3...
+
+      !........................................................
+      ! The global timesteps used by WINDS
+           
+      ELSE IF (MOD(O%Aerodyn_Timestep -1 , p%FVM%DT_RATIO) == 0 ) THEN
+            
+                ! IF ( p%FVM%SteadyFlag ) THEN ! Make it steady flow
+               DO IBlade = 1, p%numBlades
+                  DO IElement=1,p%NumBlNds   
+                     O%FVM_Other%WIND_INFTY(1, O%WINDS_Timestep, 1, IElement, IBlade) = O%FVM_Other%WIND_INFTY(1, 1, 1, IElement, IBlade)
+                     O%FVM_Other%WIND_INFTY(2, O%WINDS_Timestep, 1, IElement, IBlade) = O%FVM_Other%WIND_INFTY(2, 1, 1, IElement, IBlade)
+                     O%FVM_Other%WIND_INFTY(3, O%WINDS_Timestep, 1, IElement, IBlade) = O%FVM_Other%WIND_INFTY(3, 1, 1, IElement, IBlade) 
+                     
+                     O%FVM_Other%WIND_INFTYM(1, O%WINDS_Timestep, 1, IElement, IBlade) = O%FVM_Other%WIND_INFTYM(1,1,1,IElement,IBlade)                
+                  END DO                  
+               END DO             
+               !END IF  ! p%FVM%SteadyFlag            
+          
+                 ! Check if Wake should be cut off
+               CALL WINDS_check_cutoff(u, p, O, xd, O%WINDS_Timestep, ErrStat, ErrMess)               
+               IF (ErrStat /= 0 ) RETURN
+               
+                 ! Calculate positions and velocity of blades   
+               CALL WINDS_Kinematics(u, p, O, xd, O%WINDS_Timestep, ErrStat, ErrMess)
+               IF (ErrStat /= 0 ) RETURN
+               
+               CALL WINDS_Velocity(u, p, O, xd, O%WINDS_Timestep, ErrStat, ErrMess)    
+               IF (ErrStat /= 0 ) RETURN
+               
+               CALL WINDS_FVM(u, p, O, xd, O%WINDS_Timestep, ErrStat, ErrMess)   ! Part of the WInDS main driver       
+               IF (ErrStat /= 0 ) RETURN
+               
+               DO IBlade=1, p%numBlades
+                  DO IElement=1,p%NumBlNds
+                     y%BladeLoad(IBlade)%Force(1,IElement)  = O%FVM_Other%StoredForces(1, O%WINDS_Timestep, 1, IElement, IBlade)   
+                     y%BladeLoad(IBlade)%Force(2,IElement)  = O%FVM_Other%StoredForces(2, O%WINDS_Timestep, 1, IElement, IBlade)   
+                     y%BladeLoad(IBlade)%Force(3,IElement)  = O%FVM_Other%StoredForces(3, O%WINDS_Timestep, 1, IElement, IBlade)   
+                     y%BladeLoad(IBlade)%Moment(1,IElement) = O%FVM_Other%StoredMoments(1, O%WINDS_Timestep, 1, IElement, IBlade)
+                     y%BladeLoad(IBlade)%Moment(2,IElement) = O%FVM_Other%StoredMoments(2, O%WINDS_Timestep, 1, IElement, IBlade)
+                     y%BladeLoad(IBlade)%Moment(3,IElement) = O%FVM_Other%StoredMoments(3, O%WINDS_Timestep, 1, IElement, IBlade)                 
+                 
+                     O%FVM_Other%PreviousForces(1, 1, 1, IElement, IBlade)  = y%BladeLoad(IBlade)%Force(1,IElement)  
+                     O%FVM_Other%PreviousForces(2, 1, 1, IElement, IBlade)  = y%BladeLoad(IBlade)%Force(2,IElement) 
+                     O%FVM_Other%PreviousForces(3, 1, 1, IElement, IBlade)  = y%BladeLoad(IBlade)%Force(3,IElement)    
+                     O%FVM_Other%PreviousMoments(1, 1, 1, IElement, IBlade) = y%BladeLoad(IBlade)%Moment(1,IElement)
+                     O%FVM_Other%PreviousMoments(2, 1, 1, IElement, IBlade) = y%BladeLoad(IBlade)%Moment(2,IElement) 
+                     O%FVM_Other%PreviousMoments(3, 1, 1, IElement, IBlade) = y%BladeLoad(IBlade)%Moment(3,IElement)                       
+                  ENDDO
+               ENDDO  
+               
+                       ! Debug option to ouput blade element data.
+                       IF (p%FVM%element_output) THEN
+                          !!..........................................................
+                          !!Umass debug              
+                           WRITE (temp_number , "(I6.6)") ( O%WINDS_Timestep )   
+                      
+                           ! CL
+                           PRINT_NAME1 = 0.0
+                           DO IElement = 1, NS
+                               DO IBlade =  1,NB
+                                   PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_CL(1, O%WINDS_Timestep, 1, IElement, IBlade) 
+                               END DO  
+                           END DO  
+                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_cl_'//TRIM(temp_number))    ! Write cl to text
+                       
+                           ! CD
+                           PRINT_NAME1 = 0.0
+                           DO IElement = 1, NS
+                               DO IBlade =  1,NB
+                                   PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_CD(1, O%WINDS_Timestep, 1, IElement, IBlade) 
+                               END DO  
+                           END DO  
+                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_cd_'//TRIM(temp_number))    ! Write cd to text    
+                       
+                       
+                           ! AOA
+                           PRINT_NAME1 = 0.0
+                           DO IElement = 1, NS
+                               DO IBlade =  1,NB
+                                  PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_AOA(1, O%WINDS_Timestep, 1, IElement, IBlade) 
+                               END DO    
+                           END DO    
+                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_aoa_'// TRIM(temp_number))  
+                           
+
+                            !V_tot                           
+                           DO IBlade =  1,NB
+                              WRITE (temp_1, "(I1)") (IBlade)    ! String of the integer With heading zeros 
+                              PRINT_NAME3 = 0.0
+                              DO IElement = 1, NS
+                                  DO IDim =  1,3
+                                     PRINT_NAME3(IElement, IDIM) = O%FVM_Other%KJ%VEL_TOT(IDIM, O%WINDS_Timestep, 1, IElement, IBlade) 
+                                  END DO    
+                              END DO    
+                              CALL SAVE_TO_TXT_2D(p, PRINT_NAME3 , 'WINDS_vtot_'//temp_1//'_blade_'// TRIM(temp_number)) 
+                           END DO                            
+                           !!Umass debug         
+                           !!..........................................................
+                        END IF         
+                    
+              O%WINDS_Timestep = O%WINDS_Timestep + 1      ! WInDS internal timestep, which is 1 ,2, 3...
+              
+              ! sliu: Curently, I don't access to get the FAST simulation time. User needs to set the simulation time seperately....
+               IF (O%WINDS_Timestep > p%FVM%NT ) THEN
+                   ErrStat = ErrID_Fatal
+                   ErrMESS = ' The user setting simulation time of WInDS is shorter than the FAST simulation time. '//&
+                              ' Please check the setting. '
+                   RETURN
+               END IF
+               
+         !........................................................
+         ! The global timesteps ignored by WINDS 
+                
+      ELSE
+              ! Copy the load from the previous timestep(refer to O%Aerodyn_Timestep)
+            DO IBlade=1, p%numBlades
+               DO IElement=1,p%NumBlNds
+                  y%BladeLoad(IBlade)%Force(1,IElement)  = O%FVM_Other%PreviousForces(1, 1, 1, IElement, IBlade)   
+                  y%BladeLoad(IBlade)%Force(2,IElement)  = O%FVM_Other%PreviousForces(2, 1, 1, IElement, IBlade)
+                  y%BladeLoad(IBlade)%Force(3,IElement)  = O%FVM_Other%PreviousForces(3, 1, 1, IElement, IBlade)  
+                  y%BladeLoad(IBlade)%Moment(1,IElement) = O%FVM_Other%PreviousMoments(1, 1, 1, IElement, IBlade)
+                  y%BladeLoad(IBlade)%Moment(2,IElement) = O%FVM_Other%PreviousMoments(2, 1, 1, IElement, IBlade)
+                  y%BladeLoad(IBlade)%Moment(3,IElement) = O%FVM_Other%PreviousMoments(3, 1, 1, IElement, IBlade)
+               ENDDO
+            ENDDO         
+      END IF ! ( O%Aerodyn_Timestep == -1 ) 
+         
+      O%Aerodyn_Timestep = O%Aerodyn_Timestep  + 1   ! Update the global timestep
+
+
+   ENDIF  ! p%FVM%UseWINDS
+
+   
+   
+   
+END SUBROUTINE WINDS_CalcOutput
+!==================================================================================================================================
+SUBROUTINE WINDS_UpdateStates( u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )                   
+ ! Loose coupling routine for solving for constraint states, integrating
+ !  continuous states, and updating discrete states
+
+
+   type(AD_InputType),          intent(  out) :: u              ! An initial guess for the input; input mesh must be defined
+   type(AD_ParameterType),      intent(inout) :: p              ! Parameters ! intent out b/c we set the WINDS parameters here
+   type(AD_ContinuousStateType),intent(  out) :: x              ! Initial continuous states
+   type(AD_DiscreteStateType),  intent(  out) :: xd             ! Initial discrete states
+   type(AD_ConstraintStateType),intent(  out) :: z              ! Initial guess of the constraint states
+   type(AD_OtherStateType),     intent(  out) :: OtherState     ! Initial other/optimization states
+   type(AD_OutputType),         intent(  out) :: y              ! Initial system outputs (outputs are not calculated;
+                                                                   !   only the output mesh is initialized)
+   integer(IntKi),              intent(  out) :: errStat        ! Error status of the operation
+   character(*),                intent(  out) :: errMsg         ! Error message if ErrStat /= ErrID_None
+
+   
+
+         ! Initialize ErrStat
+
+      ErrStat = ErrID_None
+      ErrMsg  = ""   
+   
+   
+   
+   
+      
+   
+END SUBROUTINE  WINDS_UpdateStates   
+!==================================================================================================================================
+SUBROUTINE WINDS_CalcConstrStateResidual( u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )   
+! Tight coupling routine for returning the constraint state residual
+
+   type(AD_InputType),          intent(  out) :: u              ! An initial guess for the input; input mesh must be defined
+   type(AD_ParameterType),      intent(inout) :: p              ! Parameters ! intent out b/c we set the WINDS parameters here
+   type(AD_ContinuousStateType),intent(  out) :: x              ! Initial continuous states
+   type(AD_DiscreteStateType),  intent(  out) :: xd             ! Initial discrete states
+   type(AD_ConstraintStateType),intent(  out) :: z              ! Initial guess of the constraint states
+   type(AD_OtherStateType),     intent(  out) :: OtherState     ! Initial other/optimization states
+   type(AD_OutputType),         intent(  out) :: y              ! Initial system outputs (outputs are not calculated;
+                                                                   !   only the output mesh is initialized)
+   integer(IntKi),              intent(  out) :: errStat        ! Error status of the operation
+   character(*),                intent(  out) :: errMsg         ! Error message if ErrStat /= ErrID_None
+ 
+
+   
+
+         ! Initialize ErrStat
+
+      ErrStat = ErrID_None
+      ErrMsg  = ""   
+   
+   
+   
+   
+    
+ 
+END SUBROUTINE WINDS_CalcConstrStateResidual 
+!==================================================================================================================================
+SUBROUTINE WINDS_CalcContStateDeriv( u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )  
+! Tight coupling routine for computing derivatives of continuous states
+   
+ 
+   type(AD_InputType),          intent(  out) :: u              ! An initial guess for the input; input mesh must be defined
+   type(AD_ParameterType),      intent(inout) :: p              ! Parameters ! intent out b/c we set the WINDS parameters here
+   type(AD_ContinuousStateType),intent(  out) :: x              ! Initial continuous states
+   type(AD_DiscreteStateType),  intent(  out) :: xd             ! Initial discrete states
+   type(AD_ConstraintStateType),intent(  out) :: z              ! Initial guess of the constraint states
+   type(AD_OtherStateType),     intent(  out) :: OtherState     ! Initial other/optimization states
+   type(AD_OutputType),         intent(  out) :: y              ! Initial system outputs (outputs are not calculated;
+                                                                   !   only the output mesh is initialized)
+   integer(IntKi),              intent(  out) :: errStat        ! Error status of the operation
+   character(*),                intent(  out) :: errMsg         ! Error message if ErrStat /= ErrID_None
+ 
+
+   
+
+         ! Initialize ErrStat
+
+      ErrStat = ErrID_None
+      ErrMsg  = ""   
+   
+   
+   
+   
+    
+ 
+END SUBROUTINE WINDS_CalcContStateDeriv
+!==================================================================================================================================
+SUBROUTINE WINDS_UpdateDiscState( u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg ) 
+! Tight coupling routine for updating discrete states
+
+
+ 
+   type(AD_InputType),          intent(  out) :: u              ! An initial guess for the input; input mesh must be defined
+   type(AD_ParameterType),      intent(inout) :: p              ! Parameters ! intent out b/c we set the WINDS parameters here
+   type(AD_ContinuousStateType),intent(  out) :: x              ! Initial continuous states
+   type(AD_DiscreteStateType),  intent(  out) :: xd             ! Initial discrete states
+   type(AD_ConstraintStateType),intent(  out) :: z              ! Initial guess of the constraint states
+   type(AD_OtherStateType),     intent(  out) :: OtherState     ! Initial other/optimization states
+   type(AD_OutputType),         intent(  out) :: y              ! Initial system outputs (outputs are not calculated;
+                                                                   !   only the output mesh is initialized)
+   integer(IntKi),              intent(  out) :: errStat        ! Error status of the operation
+   character(*),                intent(  out) :: errMsg         ! Error message if ErrStat /= ErrID_None
+ 
+
+   
+
+         ! Initialize ErrStat
+
+      ErrStat = ErrID_None
+      ErrMsg  = ""   
+   
+   
+   
+   
+    
+ 
+END SUBROUTINE WINDS_UpdateDiscState
+!==================================================================================================================================
+SUBROUTINE WINDS_SetParameters( u_AD, InputFileData, p, O, ErrStat, ErrMess )
 ! This subroutine sets the parameters, based on the data stored in InputFileData
 ! Called from: AD_Init (in AeroDyn.f90)
 ! (~ part of WInDS.m, constants.m, NRELrotor.m)
@@ -95,7 +658,8 @@ SUBROUTINE WINDS_SetParameters( InitInp, p, O, ErrStat, ErrMess )
 
 
       ! Passed variables
-   type(BEMT_InitInputType), intent(in   )    :: InitInp       ! Input data for initialization routine
+   type(AD_InputType),       intent(in   )    :: u_AD           ! AD inputs - used for input mesh node positions
+   type(AD_InputFile),       intent(in   )   :: InputFileData                       ! All the data in the AeroDyn input file
    TYPE(AD_ParameterType),   INTENT(INOUT)    :: p              ! The module's parameter data
    TYPE(AD_OtherStateType),  INTENT(INOUT)    :: O              ! Other/optimization states   
    INTEGER(IntKi),           INTENT(OUT)      :: ErrStat        ! The error status code
@@ -112,15 +676,23 @@ SUBROUTINE WINDS_SetParameters( InitInp, p, O, ErrStat, ErrMess )
    CHARACTER(LEN=8)    :: DATE_WINDS
    CHARACTER(LEN=10)   :: TIME_WINDS
 
+ ! Local variables
+   
+   REAL(DbKi),DIMENSION(p%NumBlNds, p%numBlades) :: zLocal
+   REAL(DbKi)     :: zHub, zTip
+   integer(IntKi) :: j, k, File
+   
+
    
    ! ....................................................................................................
       ! Basic parameters for simulation
    p%FVM%NB         =   p%numBlades          ! Number of blades
-   p%FVM%NST        =   p%NumBlNds + 1   ! Number of trailing nodes (number of station +1) 
-   p%FVM%NS         =   p%NumBlNds       ! Number of shed nodes (stations)      
+   p%FVM%NST        =   p%NumBlNds + 1       ! Number of trailing nodes (number of station +1). After  meshed...
+   p%FVM%NS         =   p%NumBlNds           ! Number of shed nodes (stations). After  meshed...      
    
    NST              =   p%FVM%NST   ! just for convenience
    NS               =   p%FVM%NS    ! just for convenience 
+   
    
 
    p%FVM%DT_WINDS   =   p%FVM%DT_RATIO  * p%DT             ! Timestep duration in WInDS
@@ -154,6 +726,43 @@ SUBROUTINE WINDS_SetParameters( InitInp, p, O, ErrStat, ErrMess )
    p%FVM%CURRENT_TIME   =  DATE_WINDS//'_'//TIME_WINDS(1:6)   ! hhmmss - CCYYMMDD      Refer: http://docs.oracle.com/cd/E19957-01/805-4942/6j4m3r8t2/index.html
                                     ! The current time, in the form hhmmss.sss, where hh is the hour, mm minutes, and ss.sss seconds and milliseconds.
                                     ! Date, in form CCYYMMDD, where CCYY is the four-digit year, MM the two-digit month, and DD the two-digit day of the month.
+
+   
+   
+    
+
+   ! ....................................................................................................
+   ! Blade proporties. Modified from AeroDyn.f90 line 1629       ! sliu: any need to loop the blades??
+   do k=1,p%numBlades
+      
+      zHub = TwoNorm( u_AD%BladeRootMotion(k)%Position(:,1) - u_AD%HubMotion%Position(:,1) )  
+      !if (EqualRealNos(p%Blade_HubRadius, 0.0_ReKi) ) &
+         ! call SetErrStat( ErrID_Fatal, "zHub for blade "//trim(num2lstr(k))//" is zero.", ErrStat, ErrMsg, RoutineName)
+      
+      zLocal(1,k) = zHub + TwoNorm( u_AD%BladeMotion(k)%Position(:,1) - u_AD%BladeRootMotion(k)%Position(:,1) )
+      do j=2,p%NumBlNds
+         zLocal(j,k) = zLocal(j-1,k) + TwoNorm( u_AD%BladeMotion(k)%Position(:,j) - u_AD%BladeMotion(k)%Position(:,j-1) ) 
+      end do !j=nodes
+      
+      zTip = zLocal(p%NumBlNds,k)
+      
+   end do !k=blades   
+      
+   
+   p%Blade_TipRadius = zTip    ! Tip radius of blade. Assume three same blades.    
+   p%Blade_HubRadius = zHub    ! Hub radius of blade. Assume three same blades.        
+   
+   P%AirFoil_NumFoil = InputFileData%NumAFfiles   ! "The number of airfoil files"
+   ! P%AirFoil_NumCl   =         ! "Length of the Alpha and Coefs arrays"	-
+   
+    IF (.NOT. ALLOCATED(P%AirFoil_FoilNm)) THEN   ! sliu: should move or change this part...
+      ALLOCATE ( P%AirFoil_FoilNm( P%AirFoil_NumFoil ) , STAT=ErrStat )
+    END IF
+   
+   
+   DO File=1, InputFileData%NumAFfiles
+      P%AirFoil_FoilNm(File) = InputFileData%AFNames(File)
+   END DO
    
    !-----------------------------------------------------------------------------------------------------
       ! Parameters for blade element
@@ -176,14 +785,14 @@ SUBROUTINE WINDS_SetParameters( InitInp, p, O, ErrStat, ErrMess )
    !DO IElement2 = 2, p%FVM%NST
    !   p%BLADE_RTrail (IElement2) = p%BLADE_RTrail(IElement2 -1) + p%BLADE_DR(IElement2 -1)
    !END DO
-   p%BLADE_RNodes(1) =  InitInp%zTip(1) + InputFileData%BladeProps(1)%BlSpn(1)/2
+   p%BLADE_RNodes(1) =  zTip + InputFileData%BladeProps(1)%BlSpn(1)/2
    DO IElement = 2, p%FVM%NS
-      p%BLADE_RNodes(IElement) = p%BLADE_RNodes(IElement-1) +(InputFileData%BladeProps(1)%BlSpn(IElement-1) + p%BLADE_DR(IElement))/2
+      p%BLADE_RNodes(IElement) = p%BLADE_RNodes(IElement-1) + (InputFileData%BladeProps(1)%BlSpn(IElement-1) + InputFileData%BladeProps(1)%BlSpn(IElement))/2    !  p%BLADE_RNodes(IElement-1) +(InputFileData%BladeProps(1)%BlSpn(IElement-1) + p%BLADE_DR(IElement))/2
    END DO
 
-   p%BLADE_RTrail(1) = InitInp%zTip(1)
+   p%BLADE_RTrail(1) = zTip
    DO IElement2 = 2, p%FVM%NST
-      p%BLADE_RTrail (IElement2) = p%BLADE_RTrail(IElement2 -1) + InputFileData%BladeProps(1)%BlSpn(IElement2 -1)
+      p%BLADE_RTrail (IElement2) = zLocal(IElement,1)   ! p%BLADE_RTrail(IElement2 -1) + InputFileData%BladeProps(1)%BlSpn(IElement2 -1)
    END DO       
 
    
@@ -1674,9 +2283,9 @@ SUBROUTINE WINDS_Kinematics(u, p, O, xd, N, ErrStat, ErrMess)
       ! Aerodynamic center of every blade elememt
    DO IBlade = 1, NB
       DO IElement = 1, NS 
-         O%FVM_Other%POS_AEROCENT(1, N, 1, IElement, IBlade) = u%InputMarkers(IBlade)%Position(1, IElement)
-         O%FVM_Other%POS_AEROCENT(2, N, 1, IElement, IBlade) = u%InputMarkers(IBlade)%Position(2, IElement)
-         O%FVM_Other%POS_AEROCENT(3, N, 1, IElement, IBlade) = u%InputMarkers(IBlade)%Position(3, IElement)
+         O%FVM_Other%POS_AEROCENT(1, N, 1, IElement, IBlade) = u%BladeMotion(IBlade)%Position(1,IElement)      ! AeroDyn 14: u%BladeMotion(IBlade)%Position(1, IElement)
+         O%FVM_Other%POS_AEROCENT(2, N, 1, IElement, IBlade) = u%BladeMotion(IBlade)%Position(2,IElement)      !u%BladeMotion(IBlade)%Position(2, IElement)
+         O%FVM_Other%POS_AEROCENT(3, N, 1, IElement, IBlade) = u%BladeMotion(IBlade)%Position(3,IElement)      !u%BladeMotion(IBlade)%Position(3, IElement)
       END DO
    END DO
 
@@ -1686,22 +2295,22 @@ SUBROUTINE WINDS_Kinematics(u, p, O, xd, N, ErrStat, ErrMess)
    DO IBlade = 1, NB
       DO IElement = 1, NS 
          O%FVM_Other%POS_END(1, N, 1, IElement, IBlade) = O%FVM_Other%POS_AEROCENT(1, N, 1, IElement, IBlade) +     &  
-                                                          (1 - p%BLADE_AEROCEN(IElement)) * p%BLADE_C(IElement) *   &
-                                                          u%InputMarkers(IBlade)%Orientation(2,1,IElement)  
+                                                          (1 - p%BLADE_AEROCEN(IElement)) * p%BEMT%chord(IElement, 1) *   &
+                                                          u%BladeMotion(IBlade)%Orientation(2,1,IElement)  
          O%FVM_Other%POS_END(2, N, 1, IElement, IBlade) = O%FVM_Other%POS_AEROCENT(2, N, 1, IElement, IBlade) +     &
-                                                          (1 - p%BLADE_AEROCEN(IElement)) * p%BLADE_C(IElement)     &  
-                                                           * u%InputMarkers(IBlade)%Orientation(2,2,IElement) 
+                                                          (1 - p%BLADE_AEROCEN(IElement)) * p%BEMT%chord(IElement, 1)     &  
+                                                           * u%BladeMotion(IBlade)%Orientation(2,2,IElement) 
          O%FVM_Other%POS_END(3, N, 1, IElement, IBlade) = O%FVM_Other%POS_AEROCENT(3, N, 1, IElement, IBlade) +    &
-                                                          (1 - p%BLADE_AEROCEN(IElement)) * p%BLADE_C(IElement)    &
-                                                           * u%InputMarkers(IBlade)%Orientation(2,3,IElement) 
+                                                          (1 - p%BLADE_AEROCEN(IElement)) * p%BEMT%chord(IElement, 1)    &
+                                                           * u%BladeMotion(IBlade)%Orientation(2,3,IElement) 
       END DO
    END DO 
   
    DO IBlade = 1, NB
       DO IElement = 1, NS 
-         O%FVM_Other%POS_BOUND(1, N, 1, IElement, IBlade) = u%InputMarkers(IBlade)%Position(1,IElement)
-         O%FVM_Other%POS_BOUND(2, N, 1, IElement, IBlade) = u%InputMarkers(IBlade)%Position(2,IElement)
-         O%FVM_Other%POS_BOUND(3, N, 1, IElement, IBlade) = u%InputMarkers(IBlade)%Position(3,IElement)
+         O%FVM_Other%POS_BOUND(1, N, 1, IElement, IBlade) = u%BladeMotion(IBlade)%Position(1,IElement)
+         O%FVM_Other%POS_BOUND(2, N, 1, IElement, IBlade) = u%BladeMotion(IBlade)%Position(2,IElement)
+         O%FVM_Other%POS_BOUND(3, N, 1, IElement, IBlade) = u%BladeMotion(IBlade)%Position(3,IElement)
          
       END DO
    END DO   
@@ -1857,9 +2466,9 @@ SUBROUTINE WINDS_Velocity(u, p, O, xd, N, ErrStat, ErrMess)
    ! Transfer the velocity of aerodynamic center (in the inertial coordinate system)     ! sliu: it is useless but exists in Matlab code
    DO IBlade = 1, NB           
       DO IElement = 1, NS 
-         O%FVM_Other%VEL_AEROCENT(1, N, 1, IElement, IBlade) = u%InputMarkers(IBlade)%TranslationVel(1,IElement)  ! TranslationVel is in the inertial coordinate system (Aerodynamic center)
-         O%FVM_Other%VEL_AEROCENT(2, N, 1, IElement, IBlade) = u%InputMarkers(IBlade)%TranslationVel(2,IElement)
-         O%FVM_Other%VEL_AEROCENT(3, N, 1, IElement, IBlade) = u%InputMarkers(IBlade)%TranslationVel(3,IElement)
+         O%FVM_Other%VEL_AEROCENT(1, N, 1, IElement, IBlade) = u%BladeMotion(IBlade)%TranslationVel(1,IElement)  ! TranslationVel is in the inertial coordinate system (Aerodynamic center)
+         O%FVM_Other%VEL_AEROCENT(2, N, 1, IElement, IBlade) = u%BladeMotion(IBlade)%TranslationVel(2,IElement)
+         O%FVM_Other%VEL_AEROCENT(3, N, 1, IElement, IBlade) = u%BladeMotion(IBlade)%TranslationVel(3,IElement)
       END DO
    END DO
    
@@ -1909,7 +2518,7 @@ SUBROUTINE WINDS_Velocity(u, p, O, xd, N, ErrStat, ErrMess)
    DO IBlade = 1, NB
       DO IElement = 1, NS
          DO IDim = 1, 3
-            O%FVM_Other%POS_NODES_BXN(IDim,N,1,IElement,IBlade)  =  u%InputMarkers(IBlade)%Orientation(2,IDim,IElement)    ! CoordS%te2 in ElastoDyn
+            O%FVM_Other%POS_NODES_BXN(IDim,N,1,IElement,IBlade)  =  u%BladeMotion(IBlade)%Orientation(2,IDim,IElement)    ! CoordS%te2 in ElastoDyn
          END DO             
       END DO
    END DO      
@@ -1955,7 +2564,7 @@ SUBROUTINE WINDS_Velocity(u, p, O, xd, N, ErrStat, ErrMess)
       O%FVM_Other%POS_NODES_BZN(:,N,1,IElement +1,:) =  O%FVM_Other%POS_NODES_BZN(:,N,1,IElement,:)
    END DO
    
-   DO IElement = 1, NS      !  another method: O%FVM_Other%POS_NODES_BYN is same direction with u%InputMarkers(IBlade)%Orientation(1,:,:)  and CoordS%te1 in ElastoDyn
+   DO IElement = 1, NS      !  another method: O%FVM_Other%POS_NODES_BYN is same direction with u%BladeMotion(IBlade)%Orientation(1,:,:)  and CoordS%te1 in ElastoDyn
       DO IBlade = 1, NB
          temp3(1) = O%FVM_Other%POS_NODES_BZN(1,N,1,IElement,IBlade)
          temp3(2) = O%FVM_Other%POS_NODES_BZN(2,N,1,IElement,IBlade)
@@ -2175,7 +2784,7 @@ SUBROUTINE WINDS_FVMInitial(u, p, O, xd, ErrStat, ErrMess, x, z, y)
             ! Use Kutta-Joukowski theorem to define bound circulation strength         
    DO IBlade = 1, NB     
       DO IElement = 1, NS   
-         O%FVM_Other%WAKE_GAMMA_SHED(1, 1, 1, IElement, IBlade) = 0.5 * O%FVM_Other%WIND_INFTYM(1,1,1,1,1) * p%BLADE_C(IElement) *     &
+         O%FVM_Other%WAKE_GAMMA_SHED(1, 1, 1, IElement, IBlade) = 0.5 * O%FVM_Other%WIND_INFTYM(1,1,1,1,1) * p%BEMT%chord(IElement, 1) *     &
                                                                     O%FVM_Other%PERF_CL(1, 1, 1, IElement, 1)     
      
       END DO !IElement
@@ -2340,7 +2949,59 @@ SUBROUTINE WINDS_Shear_Model(p, O, ErrStat, ErrMess)
    END IF
 
 END SUBROUTINE WINDS_Shear_Model
+!==================================================================================================================================
+SUBROUTINE Aero_Forces(u, p, xd, O, ErrStat, ErrMess)
+! Refered to subroutine SetOutputsFromBEMT in AeroDyn.f90
+!................................................................
+  IMPLICIT                        NONE
 
+
+      ! Passed variables
+
+   TYPE(AD_InputType),            INTENT(IN   )  :: u           ! Inputs at Time      
+   TYPE(AD_ParameterType),        INTENT(IN   )  :: p           ! Parameters
+   TYPE(AD_DiscreteStateType),    INTENT(IN   )  :: xd          ! Discrete states at t
+   TYPE(AD_OtherStateType),       INTENT(INOUT)  :: O           ! Other/optimization states
+   INTEGER(IntKi),                INTENT(INOUT)  :: ErrStat     ! Error status of the operation
+   CHARACTER(*),                  INTENT(INOUT)  :: ErrMess      ! Error message if ErrStat /= ErrID_None
+
+
+   integer(intKi)                          :: j                      ! loop counter for nodes
+   integer(intKi)                          :: k                      ! loop counter for blades
+   real(reki)                              :: force(3)
+   real(reki)                              :: moment(3)
+   real(reki)                              :: q
+
+   
+   force(3)    =  0.0_ReKi          
+   moment(1:2) =  0.0_ReKi          
+   do k=1,p%NumBlades
+      do j=1,p%NumBlNds
+                      
+         q = 0.5 * p%airDens * OtherState%BEMT_y%inducedVel(j,k)**2        ! dynamic pressure of the jth node in the kth blade
+         force(1) =  OtherState%BEMT_y%cx(j,k) * q * p%BEMT%chord(j,k)     ! X = normal force per unit length (normal to the plane, not chord) of the jth node in the kth blade
+         force(2) = -OtherState%BEMT_y%cy(j,k) * q * p%BEMT%chord(j,k)     ! Y = tangential force per unit length (tangential to the plane, not chord) of the jth node in the kth blade
+         moment(3)=  OtherState%BEMT_y%cm(j,k) * q * p%BEMT%chord(j,k)**2  ! M = pitching moment per unit length of the jth node in the kth blade
+         
+            ! save these values for possible output later:
+         OtherState%X(j,k) = force(1)
+         OtherState%Y(j,k) = force(2)
+         OtherState%M(j,k) = moment(3)
+         
+            ! note: because force and moment are 1-d arrays, I'm calculating the transpose of the force and moment outputs
+            !       so that I don't have to take the transpose of WithoutSweepPitchTwist(:,:,j,k)
+         y%BladeLoad(k)%Force(:,j)  = matmul( force,  OtherState%WithoutSweepPitchTwist(:,:,j,k) )  ! force per unit length of the jth node in the kth blade
+         y%BladeLoad(k)%Moment(:,j) = matmul( moment, OtherState%WithoutSweepPitchTwist(:,:,j,k) )  ! moment per unit length of the jth node in the kth blade
+         
+      end do !j=nodes
+   end do !k=blades
+      
+   
+
+
+
+
+End SUBROUTINE Aero_Forces
 !==================================================================================================================================
 SUBROUTINE Aero_Loads(u, p, xd, O, ErrStat, ErrMess)
 ! Calculate the aerodynamic loads on the blades (as "perform" function in Matlab WInDS)
@@ -2405,9 +3066,9 @@ SUBROUTINE Aero_Loads(u, p, xd, O, ErrStat, ErrMess)
    DO IElement = 1, NS
       DO IBlade = 1, NB  
          Elem_pitch = -1.*ATAN2( -1.*DOT_PRODUCT( u%TurbineComponents%Blade(IBlade)%Orientation(1,:),    &
-                                                           u%InputMarkers(IBlade)%Orientation(2,:,IElement) ) , &
+                                                           u%BladeMotion(IBlade)%Orientation(2,:,IElement) ) , &
                                               DOT_PRODUCT( u%TurbineComponents%Blade(IBlade)%Orientation(1,:),    &
-                                                           u%InputMarkers(IBlade)%Orientation(1,:,IElement) )   ) 
+                                                           u%BladeMotion(IBlade)%Orientation(1,:,IElement) )   ) 
                     
          PHI      = O%FVM_Other%PERF_AOA(1, N, 1, IElement, IBLADE) + Elem_pitch  ! Elem_pitch is blade element pitch, so no Twist angle needed  .... it has opposite sign with Matlab WInDS, but same with BEM in AeroDyn
          CLA      = O%FVM_Other%PERF_CL(1, N, 1, IElement, IBLADE) 
@@ -2416,7 +3077,7 @@ SUBROUTINE Aero_Loads(u, p, xd, O, ErrStat, ErrMess)
          
          W2 = O%FVM_Other%KJ%VEL_TOT(1, N, 1, IElement, IBLADE) **2  + O%FVM_Other%KJ%VEL_TOT(2, N, 1, IElement, IBLADE) **2
                   
-         QA       = 0.5 * P%Wind%RHO * W2 * P%BLADE_C(IElement) ! sliu: do not mutiply P%BLADE_DR(IElement) here and do not divide it in Forces (protential bug in AeroDyn)...
+         QA       = 0.5 * P%Wind%RHO * W2 * p%BEMT%chord(IElement, 1) ! sliu: do not mutiply P%BLADE_DR(IElement) here and do not divide it in Forces (protential bug in AeroDyn)...
 
          CPHI     = COS( PHI )
          SPHI     = SIN( PHI )
@@ -2424,7 +3085,7 @@ SUBROUTINE Aero_Loads(u, p, xd, O, ErrStat, ErrMess)
          DFT      = ( CLA * SPHI - CDA * CPHI ) * QA
 
          IF ( P%PMOMENT ) THEN
-            PMA  = CMA * QA * P%BLADE_C(IElement)
+            PMA  = CMA * QA * p%BEMT%chord(IElement, 1)
          ELSE
             PMA  = 0.0_DbKi
             CMA  = 0.0_DbKi
@@ -3851,48 +4512,55 @@ CONTAINS
 
                   
         ! Find coef. of lift and drag 
-      !IF (O%WINDS_Timestep > p%FVM%DS_Parms%start_n  .AND.  p%FVM%DS_Parms%DS_Flag ) THEN
-      !    ! Call Leishman-Beddoes dynamic stall model
-      !   DO IBlade = 1, NB   
-      !      DO IElement = 1, NS
-      !         Check_name =  INDEX((p%AirFoil%FOILNM(P%AirFoil%NFOIL(IElement))), "Cylinder")    
-      !         IF (Check_name == 0) THEN ! Not "Cylinder"
-      !            CALL LB_DynStall(p, O, xd, Iiter, ErrStat, ErrMess, IElement, IBlade, CLA, CDA, CMA, P%AirFoil%NFOIL(IElement))                         
-      !         ELSE  ! "Cylinder"
-      !             CALL CLCD_FVM(p, O, xd, ErrStat, ErrMess, O%FVM_Other%KJ%AOA(1, 1, 1, IElement, IBlade), CLA, CDA, CMA, & 
-      !                           P%AirFoil%NFOIL(IElement))    
-      !         END IF   
-      !         
-      !         IF ( ErrStat /= ErrID_None )  THEN      
-      !            ErrMess = ' Error (in WInDS): Error occured when finding Cl in Kutta-Joukowski/LB_DynStall subroutine. Please check.'      
-      !            RETURN      
-      !         END IF 
-      !         
-      !         IF ( ISNAN(CLA) )  THEN
-      !            ErrStat =  ErrID_Fatal
-      !            ErrMess = ' Error (in WInDS): Cl is Nan in Kutta-Joukowski/LB_DynStall subroutine. Please check.'   
-      !            RETURN      
-      !         END IF 
-      !         
-      !         IF ( ISNAN(CDA) )  THEN
-      !            ErrStat =  ErrID_Fatal
-      !            ErrMess = ' Error (in WInDS): Cd is Nan in Kutta-Joukowski/LB_DynStall subroutine. Please check.'      
-      !            RETURN      
-      !         END IF
-      !
-      !         O%FVM_Other%KJ%CL(1,1,1,IElement,IBlade) = CLA
-      !         O%FVM_Other%KJ%CD(1,1,1,IElement,IBlade) = CDA    
-      !         O%FVM_Other%KJ%CM(1,1,1,IElement,IBlade) = CMA 
-      !      END DO
-      !   END DO    
-      !    
-      !ELSE
+      IF (O%WINDS_Timestep > p%FVM%DS_Parms%start_n  .AND.  p%FVM%DS_Parms%DS_Flag ) THEN
+          ! Call Leishman-Beddoes dynamic stall model
+         DO IBlade = 1, NB   
+            DO IElement = 1, NS
+               Check_name =  INDEX((p%AirFoil_FOILNM(P%AirFoil%NFOIL(IElement))), "Cylinder")    
+               IF (Check_name == 0) THEN ! Not "Cylinder"
+                  CALL LB_DynStall(p, O, xd, Iiter, ErrStat, ErrMess, IElement, IBlade, CLA, CDA, CMA, P%AirFoil%NFOIL(IElement))                         
+               ELSE  ! "Cylinder"
+                   ! CALL CLCD_FVM(p, O, xd, ErrStat, ErrMess, O%FVM_Other%KJ%AOA(1, 1, 1, IElement, IBlade), CLA, CDA, CMA, & 
+                   !              P%AirFoil%NFOIL(IElement))    
+                   CALL CLCDCM(p%AFI%AFInfo(p%AFindx(IElement,IBlade)),  O%FVM_Other%KJ%AOA(1, 1, 1, IElement, IBlade), & 
+                               CLA, CDA, CMA, ErrStat, ErrMess)                
+                                 
+               END IF   
+               
+               IF ( ErrStat /= ErrID_None )  THEN      
+                  ErrMess = ' Error (in WInDS): Error occured when finding Cl in Kutta-Joukowski/LB_DynStall subroutine. Please check.'      
+                  RETURN      
+               END IF 
+               
+               IF ( ISNAN(CLA) )  THEN
+                  ErrStat =  ErrID_Fatal
+                  ErrMess = ' Error (in WInDS): Cl is Nan in Kutta-Joukowski/LB_DynStall subroutine. Please check.'   
+                  RETURN      
+               END IF 
+               
+               IF ( ISNAN(CDA) )  THEN
+                  ErrStat =  ErrID_Fatal
+                  ErrMess = ' Error (in WInDS): Cd is Nan in Kutta-Joukowski/LB_DynStall subroutine. Please check.'      
+                  RETURN      
+               END IF
+      
+               O%FVM_Other%KJ%CL(1,1,1,IElement,IBlade) = CLA
+               O%FVM_Other%KJ%CD(1,1,1,IElement,IBlade) = CDA    
+               O%FVM_Other%KJ%CM(1,1,1,IElement,IBlade) = CMA 
+            END DO
+         END DO    
+          
+      ELSE
             ! Interpolate over airfoil data tables    ! ~ SUBROUTINE CLCD in AeroSubs.f90         
          DO IBlade = 1, NB   
             DO IElement = 1, NS
                  ! The routine used in original AeroDyn
-               CALL CLCD_FVM(p, O, xd, ErrStat, ErrMess, O%FVM_Other%KJ%AOA(1, 1, 1, IElement, IBlade), CLA, CDA, CMA, & 
-                             P%AirFoil%NFOIL(IElement))                         
+               !CALL CLCD_FVM(p, O, xd, ErrStat, ErrMess, O%FVM_Other%KJ%AOA(1, 1, 1, IElement, IBlade), CLA, CDA, CMA, & 
+               !              P%AirFoil%NFOIL(IElement))   
+              
+               CALL CLCDCM(p%AFI%AFInfo(p%AFindx(IElement,IBlade)),  O%FVM_Other%KJ%AOA(1, 1, 1, IElement, IBlade), & 
+                    CLA, CDA, CMA, ErrStat, ErrMess)      
+               
    
                IF ( ErrStat /= ErrID_None )  THEN      
                   ErrMess = ' Error (in WInDS): Error occured when finding Cl in Kutta-Joukowski subroutine. Please check.'      
@@ -3913,7 +4581,7 @@ CONTAINS
       DO IBlade = 1, NB           
          DO IElement = 1, NS
             O%FVM_Other%KJ%GAMMA1(1, 1, 1, IElement, IBlade) = 0.5 * O%FVM_Other%KJ%Vinf(1, 1, 1, IElement, IBlade) *    &
-                                                         p%BLADE_C(IElement) *  O%FVM_Other%KJ%CL(1, 1, 1, IElement, IBlade)
+                                                         p%BEMT%chord(IElement, 1) *  O%FVM_Other%KJ%CL(1, 1, 1, IElement, IBlade)
          END DO
       END DO         
         
@@ -4962,16 +5630,16 @@ SUBROUTINE BEM(u, p, xd, O, ErrStat, ErrMess)
           
          ! element pitch angle
          o%Element%PitNow    = -1.*ATAN2( -1.*DOT_PRODUCT( u%TurbineComponents%Blade(IBlade)%Orientation(1,:),    &
-                                                           u%InputMarkers(IBlade)%Orientation(2,:,IElement) ) , &
+                                                           u%BladeMotion(IBlade)%Orientation(2,:,IElement) ) , &
                                               DOT_PRODUCT( u%TurbineComponents%Blade(IBlade)%Orientation(1,:),    &
-                                                           u%InputMarkers(IBlade)%Orientation(1,:,IElement) )   )
+                                                           u%BladeMotion(IBlade)%Orientation(1,:,IElement) )   )
 
          SPitch    = SIN( o%Element%PitNow )
          CPitch    = COS( o%Element%PitNow )
 
 
             ! calculate distance between hub and element
-         tmpVector = u%InputMarkers(IBlade)%Position(:,IElement) - u%TurbineComponents%Hub%Position(:)
+         tmpVector = u%BladeMotion(IBlade)%Position(:,IElement) - u%TurbineComponents%Hub%Position(:)
          rLocal = SQRT(   DOT_PRODUCT( tmpVector, u%TurbineComponents%Hub%Orientation(2,:) )**2  &
                         + DOT_PRODUCT( tmpVector, u%TurbineComponents%Hub%Orientation(3,:) )**2  )          
           
@@ -4988,17 +5656,17 @@ SUBROUTINE BEM(u, p, xd, O, ErrStat, ErrMess)
          VelNormalToRotor2 = ( VelocityVec(3) * o%Rotor%STilt + (VelocityVec(1) * o%Rotor%CYaw               &
                              - VelocityVec(2) * o%Rotor%SYaw) * o%Rotor%CTilt )**2                                    ! Square of the wind velocity component normal to the rotor
 
-         tmpVector =  -1.*SPitch*u%InputMarkers(IBlade)%Orientation(1,:,IElement) &
-                        + CPitch*u%InputMarkers(IBlade)%Orientation(2,:,IElement)
-         VTTotal   =     DOT_PRODUCT( tmpVector, VelocityVec - u%InputMarkers(IBlade)%TranslationVel(:,IElement)  )   ! Component in the plane of rotation of (wind ?Deflection translational velocity )
+         tmpVector =  -1.*SPitch*u%BladeMotion(IBlade)%Orientation(1,:,IElement) &
+                        + CPitch*u%BladeMotion(IBlade)%Orientation(2,:,IElement)
+         VTTotal   =     DOT_PRODUCT( tmpVector, VelocityVec - u%BladeMotion(IBlade)%TranslationVel(:,IElement)  )   ! Component in the plane of rotation of (wind ?Deflection translational velocity )
 
-         tmpVector =     CPitch*u%InputMarkers(IBlade)%Orientation(1,:,IElement) &
-                       + SPitch*u%InputMarkers(IBlade)%Orientation(2,:,IElement)
+         tmpVector =     CPitch*u%BladeMotion(IBlade)%Orientation(1,:,IElement) &
+                       + SPitch*u%BladeMotion(IBlade)%Orientation(2,:,IElement)
          VNWind    =     DOT_PRODUCT( tmpVector, VelocityVec )                                                        ! Component normal to the plane of rotation of wind velocity alone
-         VNElement = -1.*DOT_PRODUCT( tmpVector, u%InputMarkers(IBlade)%TranslationVel(:,IElement ) )                 ! Component normal to the plane of rotation of deflection translational velocity alone      
+         VNElement = -1.*DOT_PRODUCT( tmpVector, u%BladeMotion(IBlade)%TranslationVel(:,IElement ) )                 ! Component normal to the plane of rotation of deflection translational velocity alone      
           
          LAMBDAR =  p%BLADE_RNodes(IElement) * O%Rotor%REVS / O%FVM_Other%WIND_INFTYM(1, 1, 1, 1, 1)                  ! Local speed ratio
-         SIGMAP  =  p%numBlades * P%BLADE_C(IElement) / ( TWOPI * p%BLADE_RNodes(IElement))                            ! Local solidity  
+         SIGMAP  =  p%numBlades * p%BEMT%chord(IElement, 1) / ( TWOPI * p%BLADE_RNodes(IElement))                            ! Local solidity  
          TWST    =  - P%Element%TWIST(IElement) 
          PTCH    =  o%Element%PitNow 
 
@@ -5027,13 +5695,13 @@ SUBROUTINE BEM(u, p, xd, O, ErrStat, ErrMess)
             O%FVM_Other%PERF_AOA(1, 1, 1, IElement, IBlade)   =  ALPHA            
             
             
-            QA       = 0.5 * P%Wind%RHO * W2 * P%BLADE_DR(IElement) * P%BLADE_C(IElement)
+            QA       = 0.5 * P%Wind%RHO * W2 * P%BLADE_DR(IElement) * p%BEMT%chord(IElement, 1)
             CPHI     = COS( PHI )
             SPHI     = SIN( PHI )
             DFN      = ( CLA * CPHI + CDA * SPHI ) * QA
             DFT      = ( CLA * SPHI - CDA * CPHI ) * QA
 
-            PMA  = CMA * QA * P%BLADE_C(IElement)    
+            PMA  = CMA * QA * p%BEMT%chord(IElement, 1)    
          
             O%FVM_Other%StoredForces(1, 1, 1, IElement, IBlade)   = ( DFN*CPitch + DFT*SPitch ) / p%BLADE_DR(IElement)
             O%FVM_Other%StoredForces(2, 1, 1, IElement, IBlade)   = ( DFN*SPitch - DFT*CPitch ) / p%BLADE_DR(IElement)
@@ -5114,7 +5782,9 @@ CONTAINS
       IF ( ALPHA > Pi )   ALPHA = ALPHA - TwoPi       ! To ensures that Angle lies between -pi and pi.
 
       ! Compute lift and drag coefficients
-      CALL CLCD_FVM ( P,  O, xd, ErrStat, ErrMess, ALPHA, CLA, CDA, CMA, P%AirFoil%NFoil(J) )
+      ! CALL CLCD_FVM ( P,  O, xd, ErrStat, ErrMess, ALPHA, CLA, CDA, CMA, P%AirFoil%NFoil(J) )
+       CALL CLCDCM(p%AFI%AFInfo(p%AFindx(IElement,IBlade)),  ALPHA, CLA, CDA, CMA, ErrStat, ErrMsg)      
+      
       IF (ErrStat /= 0 ) RETURN
 
       ! Compute elemental thrust coefficient
@@ -5168,6 +5838,80 @@ CONTAINS
     
       
 END SUBROUTINE BEM
+
+
+
+
+
+
+!==================================================================================================================================
+SUBROUTINE CLCDCM(AFInfo, AOA, Cl, Cd, Cm, ErrStat, ErrMsg)                        ! P,  O, xd,  ErrStat, ErrMess, ALPHA, CL, CD, CM, I)       
+! In AeroDyn 15, this part is modified from subroutine BE_CalcOutputs in BladeElement.f90
+   
+
+      type(AFInfoType),             intent(in   ) :: AFInfo
+      real(ReKi),                   intent(in   ) :: AOA            ! Angle of attack in radians
+      real(ReKi),                   intent(  out) :: Cl
+      real(ReKi),                   intent(  out) :: Cd
+      real(ReKi),                   intent(  out) :: Cm
+      integer(IntKi),               intent(  out) :: ErrStat     ! Error status of the operation
+      character(*),                 intent(  out) :: ErrMsg      ! Error message if ErrStat /= ErrID_None
+   
+      integer                         :: s1
+      
+      ErrStat = ErrID_None
+      ErrMsg  = ''
+   
+  
+   
+   
+
+        !  just one table         
+         s1 = size(AFInfo%Table(1)%Coefs,2)
+   
+         IntAFCoefs(1:s1) = CubicSplineInterpM( 1.0_ReKi*real( AOA*R2D, ReKi ) &   ! Line 926 of NWTC_Num.f90:    FUNCTION CubicSplineInterpM
+                                              , AFInfo%Table(1)%Alpha &
+                                              , AFInfo%Table(1)%Coefs &
+                                              , AFInfo%Table(1)%SplineCoefs &
+                                              , ErrStat, ErrMsg )
+   
+         Cl = IntAFCoefs(1)
+         Cd = IntAFCoefs(2)
+         Cm = IntAFCoefs(3)
+   
+      
+   
+END SUBROUTINE CLCDCM
+!==================================================================================================================================
+
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 !==================================================================================================================================
 SUBROUTINE CLCD_FVM( P,  O, xd,  ErrStat, ErrMess, ALPHA, CLA, CDA, CMA, I)    
@@ -5227,6 +5971,7 @@ SUBROUTINE CLCD_FVM( P,  O, xd,  ErrStat, ErrMess, ALPHA, CLA, CDA, CMA, I)
 
    ErrStat = ErrID_None
    ErrMess = ""
+
 
    IF (.NOT. ALLOCATED(P%AirFoil%NFoil) ) THEN
       CDA = 0
@@ -5376,5 +6121,5 @@ END SUBROUTINE CLCD_FVM
 !====================================================================================================
 
     
-END MODULE WINDS
+END MODULE WINDS_15
 !**********************************************************************************************************************************

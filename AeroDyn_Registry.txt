@@ -520,11 +520,14 @@ typedef	^	ParameterType	IntKi	TwOutNd	{9}	-	-	"Tower nodes whose values will be 
 ### Umass WINDS starts:
 typedef	^	ParameterType	FVMParmsTYPE	FVM
 typedef	^	ParameterType	IntKi	n_TMax_m1	-	-	-	"The time step of TMax - dt (the end time of the simulation)"
-#typedef	^	ParameterType	DbKi	Blade_TipRadius	-	-	-	
-#typedef	^	ParameterType	DbKi	Blade_HubRadius	-	-	-	
+typedef	^	ParameterType	DbKi	Blade_TipRadius	-	-	-	
+typedef	^	ParameterType	DbKi	Blade_HubRadius	-	-	-	
 typedef	^	ParameterType	DbKi	Blade_RTrail	{:}	-	-	
 typedef	^	ParameterType	DbKi	Blade_RNodes	{:}	-	-	"sum P%Blade%DR"
 typedef ^	ParameterType	DbKi	Blade_AeroCen	{:}	-	-	"The relative location of aerodynamic center"
+typedef ^	ParameterType	IntKi	AirFoil_NumFoil	-	-	-	"NumAFfiles"  
+typedef	^	ParameterType	IntKi	AirFoil_NumCL	-	-	-	
+typedef	^	ParameterType	CHARACTER(1024)	AirFoil_FoilNm	{:}			"Number of airfoil data sets"
 ### Umass WINDS ends 
 
 # ..... Inputs ....................................................................................................................

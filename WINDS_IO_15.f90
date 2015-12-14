@@ -2,7 +2,7 @@
 ! This module includes I/O subroutine for WInDS: read data from input file and output for Paraview.
 ! 
 !==================================================================================================================================
-MODULE WINDS_IO
+MODULE WINDS_IO_15
 
    USE NWTC_Library
    USE AeroDyn_Types
@@ -13,9 +13,9 @@ MODULE WINDS_IO
 
       ! ..... Public Subroutines ............
       
-   PUBLIC :: WInDS_ReadInput            ! Read in the input file of WInDS(FVM)
+   PUBLIC :: ReadInputWInDS            ! Read in the input file of WInDS(FVM)
    PUBLIC :: Initialize_paraview_files  ! Initialize paraview files 
-   PUBLIC :: CreateVTUembedded          ! Write paraview files 
+   PUBLIC :: CreateVTUembedded15          ! Write paraview files 
    PUBLIC :: Close_paraview_files       ! Close paraview files
    PUBLIC :: LB_load_AirfoilData        ! Load the dynamic stall airfoil data
    PUBLIC :: Write_DS_parameters        ! Write dynamic stall airfoil data
@@ -26,7 +26,8 @@ MODULE WINDS_IO
    
 CONTAINS   
 !==================================================================================================================================    
-SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
+SUBROUTINE ReadInputWInDS(P, xd, O, ErrStat, ErrMess )
+!SUBROUTINE ReadInputWInDS(InitInp, P, xd, O, ErrStat, ErrMess )
 ! Read the input of WInDS. Currently it is named "AeroDyn_WInDS.dat" and 
 ! in the same folder with AeroDyn input file    
 !...............................................................   
@@ -34,7 +35,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
     IMPLICIT                      NONE
    
    ! Passed Variables:
-   TYPE(AD_InitInputType),       INTENT(INOUT)  :: InitInp
+   ! TYPE(AD_InputFile),           INTENT(INOUT)  :: InitInp
    TYPE(AD_ParameterType),       INTENT(INOUT)  :: p           ! Parameters
    TYPE(AD_DiscreteStateType),   INTENT(INOUT)  :: xd          ! Initial discrete states
    TYPE(AD_OtherStateType),      INTENT(INOUT)  :: O !therState  ! Initial other/optimization states
@@ -51,24 +52,30 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    CHARACTER(1024)            :: FilePathName         ! The whole path of WInDS input file + Name
    LOGICAL                    :: TEST1, TEST2
    INTEGER                    :: I
-   
+   integer(IntKi)             :: UnEc                 ! I/O unit for echo file. If > 0, file is open for writing.
    CHARACTER(LEN = 1024)   :: TEMP1, TEMP2, TEMP3  ! debug
    
    
       ! Function definition      
    UnIn = 90    ! Some number for index of the file
    
+   UnEc = -1   
+   
+   
    !-------------------------------------------------------------------------------------------------
    ! Open the WInDS input file  
    !-------------------------------------------------------------------------------------------------
-   CALL GetPath( InitInp%ADFileName, FilePath )                    ! Count everything before (and including) the last "\" or "/". GetPath is defined in NWTC_IO.f90
+   ! CALL GetPath( InitInp%ADFileName, FilePath )                    ! Count everything before (and including) the last "\" or "/". GetPath is defined in NWTC_IO.f90
+   CALL GetPath( p%RootName, FilePath )  
+   
+   
    ! (sliu: currently the WInDS input file is in the same folder with AeroDyn input file)
    
    p%FVM%WINDS_dir = TRIM(FilePath)     ! record for future use
    
    FilePathName    = TRIM(FilePath)//'AeroDyn_WInDS.dat'
    
-   CALL OpenFInpFile(UnIn, TRIM(FilePathName), ErrStat)   ! This routine opens a formatted input file. OpenFInpFile is defined in NWTC_IO.f90
+   CALL OpenFInpFile(UnIn, TRIM(FilePathName), ErrStat, ErrMess)   ! This routine opens a formatted input file. OpenFInpFile is defined in NWTC_IO.f90
    IF (ErrStat /= ErrID_None ) THEN
       ErrMess = ' Error (in WInDS): Cannot find/open the input file for WInDS under path:"' //TRIM(FilePathName)//'". Please check.'   
       RETURN
@@ -78,14 +85,14 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    ! Read the WInDS input file
    !-------------------------------------------------------------------------------------------------
       ! Read in the title
-   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Title', VarDescr='File title', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Title', VarDescr='File title', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF   
    
       ! Read in the description  
-   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Desription', VarDescr='Desription', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Desription', VarDescr='Desription', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -95,14 +102,14 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    !.........................................................................
       ! Read in the "GENERAL SETTING" part 
    !....................................................................    
-   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part1', VarDescr='"GENERAL SETTING" part', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part1', VarDescr='"GENERAL SETTING" part', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF 
    
       ! Read in the total run time
-   CALL ReadVar( UnIn, FilePathName, P%FVM%Total_Time, VarName='TMax', VarDescr='Total run time', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, P%FVM%Total_Time, VarName='TMax', VarDescr='Total run time', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS (TMax option). Please check.'
       RETURN   
@@ -116,7 +123,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
       
    
       ! Read in the number of time steps stored
-   CALL ReadVar( UnIn, FilePathName, p%FVM%NTP, VarName='NTP', VarDescr='Number of time steps stored', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%NTP, VarName='NTP', VarDescr='Number of time steps stored', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -129,7 +136,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    END IF
       
       ! Read in the DT_WINDS / DT_Timestep
-   CALL ReadVar( UnIn, FilePathName, p%FVM%DT_RATIO , VarName='DtRatio', VarDescr='DT_WINDS / DT_Timestep', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%DT_RATIO , VarName='DtRatio', VarDescr='DT_WINDS / DT_Timestep', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS (DtRatio option). Please check.'
       RETURN   
@@ -143,7 +150,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
          
       ! Read in the whether steady inflow
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='SteadyFlag', VarDescr='Whether steady inflow', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='SteadyFlag', VarDescr='Whether steady inflow', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS (SteadyFlag option). Please check.'
       RETURN   
@@ -166,7 +173,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    !....................................................................
       ! Read in the "BIOT-SAVART LAW" part 
    !....................................................................   
-   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part2', VarDescr='"BIOT-SAVART LAW" part ', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part2', VarDescr='"BIOT-SAVART LAW" part ', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -174,7 +181,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
    
       ! Read in the Whether freeze the far wake
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='WakeFLAG', VarDescr='Whether to simplify the far wake', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='WakeFLAG', VarDescr='Whether to simplify the far wake', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS (WakeFLAG option). Please check.'
       RETURN   
@@ -195,7 +202,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
       
          
       ! Read in the Whether to apply induction to all wake nodes
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='RollFLAG', VarDescr='Whether to apply induction to all wake nodes', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='RollFLAG', VarDescr='Whether to apply induction to all wake nodes', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS (RollFLAG option). Please check.'
       RETURN   
@@ -216,7 +223,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
          
        ! Read in RollDist
-   CALL ReadVar( UnIn, FilePathName, p%FVM%RollDist, VarName='RollDist', VarDescr='Only work when RollFLGA is true.', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%RollDist, VarName='RollDist', VarDescr='Only work when RollFLGA is true.', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS (RollDist option). Please check.'
       RETURN   
@@ -229,7 +236,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    END IF   
    
        ! Read in WakeLength
-   CALL ReadVar( UnIn, FilePathName, p%FVM%WakeDist, VarName='WakeLength', VarDescr='Number of timesteps beyond which the wake is cut off. -1 disables cutoff.', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%WakeDist, VarName='WakeLength', VarDescr='Number of timesteps beyond which the wake is cut off. -1 disables cutoff.', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS (WakeLength option). Please check.'
       RETURN   
@@ -244,7 +251,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
   
     
       ! Read in the Average wind speed
-   CALL ReadVar( UnIn, FilePathName, p%FVM%AveSpeed , VarName='AveSpeed', VarDescr='Average wind speed', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%AveSpeed , VarName='AveSpeed', VarDescr='Average wind speed', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS (AveSpeed option). Please check.'
       RETURN   
@@ -259,7 +266,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
          
        ! Read in the whether the "frozen" filaments will retain the induced velocity from the most recent timestep. 
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='UindPast', VarDescr='UindPast option', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='UindPast', VarDescr='UindPast option', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS (UindPast option). Please check.'
       RETURN   
@@ -283,7 +290,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
    
        ! Read in the whether Vatistas viscous model
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='ViscFLAG', VarDescr='Vatistas viscous model', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='ViscFLAG', VarDescr='Vatistas viscous model', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS (ViscFLAG option). Please check.'
       RETURN   
@@ -304,7 +311,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
    
        ! Read in the Index of Vatistas viscous model
-   CALL ReadVar( UnIn, FilePathName, p%FVM%VISC, VarName='ViscModel', VarDescr='Index of Vatistas viscous model', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%VISC, VarName='ViscModel', VarDescr='Index of Vatistas viscous model', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS (ViscModel option). Please check.'
       RETURN   
@@ -317,7 +324,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    END IF   
    
        ! Read in the Smooth parameter
-   CALL ReadVar( UnIn, FilePathName, p%FVM%DELTA, VarName='DELTA', VarDescr='Smooth parameter', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%DELTA, VarName='DELTA', VarDescr='Smooth parameter', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -333,14 +340,14 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
       ! Read in the "NUMERICAL METHODS AND SOLUTION" part 
    !....................................................................   
    CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part3',                                 &
-           VarDescr='"NUMERICAL METHODS AND SOLUTION" part ', ErrStat=ErrStat)
+           VarDescr='"NUMERICAL METHODS AND SOLUTION" part ', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF 
    
        ! Read in the Numerical integration scheme
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='INTEG', VarDescr='Numerical integration scheme', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='INTEG', VarDescr='Numerical integration scheme', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -362,7 +369,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
     
        ! Read in the Tolerance value for convergence of numerical methods
    CALL ReadVar( UnIn, FilePathName, p%FVM%TOL, VarName='Tolerance',                            &
-            VarDescr='Tolerance value for convergence of numerical methods', ErrStat=ErrStat)
+            VarDescr='Tolerance value for convergence of numerical methods', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS (Tolerance option). Please check.'
       RETURN   
@@ -376,7 +383,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
             
        ! Read in the Distance from wake nodes beyond which influence is negligible
    CALL ReadVar( UnIn, FilePathName, p%FVM%CO , VarName='CO',                          &
-            VarDescr='Distance from wake nodes beyond which influence is negligible', ErrStat=ErrStat)
+            VarDescr='Distance from wake nodes beyond which influence is negligible', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -384,7 +391,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
        ! Read in the Relaxation value for fixed-point iteration
    CALL ReadVar( UnIn, FilePathName, p%FVM%RELAX , VarName='RELAX',                         &
-              VarDescr='Relaxation value for fixed-point iteration', ErrStat=ErrStat)
+              VarDescr='Relaxation value for fixed-point iteration', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -392,14 +399,14 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
        ! Read in the Maximum number of iterations for Kutta-Joukowski theorem 
    CALL ReadVar( UnIn, FilePathName, p%FVM%MAXITER , VarName='MaxIter',                    &
-             VarDescr='Maximum number of iterations for Kutta-Joukowski theorem ', ErrStat=ErrStat)
+             VarDescr='Maximum number of iterations for Kutta-Joukowski theorem ', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF 
    
        ! Read in the whether to use quadratic extrapolation to guess next bound vorticity value
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='ExtrapWake', VarDescr='whether to use quadratic extrapolation to guess next bound vorticity value', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='ExtrapWake', VarDescr='whether to use quadratic extrapolation to guess next bound vorticity value', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS (ExtrapWake option). Please check.'
       RETURN   
@@ -423,14 +430,14 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    !....................................................................
       ! Read in the "BEM (First timestep in WInDS)" part 
    !....................................................................   
-   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part4', VarDescr='"BEM (First timestep in WInDS)" part', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part4', VarDescr='"BEM (First timestep in WInDS)" part', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF 
    
        ! Read in the BEM Convergence tolerance
-   CALL ReadVar( UnIn, FilePathName, p%FVM%BEM_Parms%TOL , VarName='BEMTOL', VarDescr='Convergence tolerance', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%BEM_Parms%TOL , VarName='BEMTOL', VarDescr='Convergence tolerance', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -444,7 +451,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
       
        ! Read in the Maximum number of allowable iterations for BEM
    CALL ReadVar( UnIn, FilePathName,p%FVM%BEM_Parms%MAX_ITER, VarName='MAX_ITER',                   &
-        VarDescr='Maximum number of allowable iterations for BEM', ErrStat=ErrStat)
+        VarDescr='Maximum number of allowable iterations for BEM', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -452,7 +459,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
        ! Read in the Weighting factor on corrections to balance speed with stability
    CALL ReadVar( UnIn, FilePathName, p%FVM%BEM_Parms%WT , VarName='WEIGHT',                      &
-              VarDescr='Weighting factor on corrections to balance speed with stability', ErrStat=ErrStat)
+              VarDescr='Weighting factor on corrections to balance speed with stability', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -469,14 +476,14 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    !....................................................................
       ! Read in the "WIND SHEAR" part 
    !....................................................................   
-   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part5', VarDescr='Part5', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part5', VarDescr='Part5', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF 
    
        ! Read in the Wind shear (flag)
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='ShearFLAG', VarDescr='Wind shear (flag)', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='ShearFLAG', VarDescr='Wind shear (flag)', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -496,7 +503,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
       END SELECT      
    
        ! Read in the ShearType
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='ShearType', VarDescr='Shear Type', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='ShearType', VarDescr='Shear Type', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -519,7 +526,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
       
        ! Read in the Hub height
-   CALL ReadVar( UnIn, FilePathName, p%FVM%Shear_Parms%z_ref , VarName='ZRef', VarDescr='Hub height', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%Shear_Parms%z_ref , VarName='ZRef', VarDescr='Hub height', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -530,7 +537,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    !....................................................................
       ! Read in the "TOWER SHADOW" part 
    !....................................................................   
-   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part6', VarDescr='Part6', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part6', VarDescr='Part6', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -538,7 +545,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
        ! Read in the Include induced velocity from tower effects
    CALL ReadVar( UnIn, FilePathName, LINE , VarName='TWRFLAG',                   &
-           VarDescr='Include induced velocity from tower effects', ErrStat=ErrStat)
+           VarDescr='Include induced velocity from tower effects', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -558,7 +565,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
          END SELECT      
          
        ! Read in the Tower UP or DOWN
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='TWRUPDOWN', VarDescr='Tower UP or DOWN', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='TWRUPDOWN', VarDescr='Tower UP or DOWN', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -578,7 +585,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
       END SELECT       
    
        ! Read in the Tower METHOD
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='TWRMETHOD', VarDescr='Tower METHOD', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='TWRMETHOD', VarDescr='Tower METHOD', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -602,7 +609,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    !....................................................................
       ! Read in the "GROUND EFFECTS" part 
    !....................................................................   
-   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part6', VarDescr='Part6', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part6', VarDescr='Part6', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -610,7 +617,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
        ! Read in the Include vortex panels to model ground effects (flag)
    CALL ReadVar( UnIn, FilePathName, LINE , VarName='GroundFLAG',                   &
-           VarDescr='Include vortex panels to model ground effects (flag)', ErrStat=ErrStat)
+           VarDescr='Include vortex panels to model ground effects (flag)', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -631,7 +638,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
          
        ! Read in the Method for calculating ground effects
    CALL ReadVar( UnIn, FilePathName, LINE , VarName='GroundMethod',                   &
-         VarDescr='Method for calculating ground effects', ErrStat=ErrStat)
+         VarDescr='Method for calculating ground effects', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -653,35 +660,35 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
       
        ! Read in the Square of panel quantity
    CALL ReadVar( UnIn, FilePathName, p%FVM%Ground_Parms%Sqrt_Panels ,                   &
-         VarName='SqrtPanels', VarDescr='Square of panel quantity', ErrStat=ErrStat)
+         VarName='SqrtPanels', VarDescr='Square of panel quantity', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF 
    
        ! Read in the GroundXmin
-   CALL ReadVar( UnIn, FilePathName, p%FVM%Ground_Parms%Extent(1) , VarName='GroundXmin', VarDescr='GroundXmin', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%Ground_Parms%Extent(1) , VarName='GroundXmin', VarDescr='GroundXmin', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF 
    
        ! Read in the GroundXmax
-   CALL ReadVar( UnIn, FilePathName, p%FVM%Ground_Parms%Extent(2) , VarName='GroundXmax', VarDescr='GroundXmax', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%Ground_Parms%Extent(2) , VarName='GroundXmax', VarDescr='GroundXmax', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF 
    
        ! Read in the GroundYmin
-   CALL ReadVar( UnIn, FilePathName, p%FVM%Ground_Parms%Extent(3) , VarName='GroundYmin', VarDescr='GroundYmin', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%Ground_Parms%Extent(3) , VarName='GroundYmin', VarDescr='GroundYmin', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF 
    
        ! Read in the GroundYmax
-   CALL ReadVar( UnIn, FilePathName, p%FVM%Ground_Parms%Extent(4) , VarName='GroundYmax', VarDescr='GroundYmax', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%Ground_Parms%Extent(4) , VarName='GroundYmax', VarDescr='GroundYmax', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -690,14 +697,14 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    !....................................................................
       ! Read in the "DYNAMIC STALL" part 
    !....................................................................   
-   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part7', VarDescr='DYNAMIC STALL', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part7', VarDescr='DYNAMIC STALL', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF 
       
        ! Read in the Whether to use LB dynamic stall model
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='DS_Flag', VarDescr='Whether to use LB dynamic stall model', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='DS_Flag', VarDescr='Whether to use LB dynamic stall model', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -717,7 +724,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
          END SELECT              
    
        ! Read in the Whether to tune LB dynamic stall model
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='RelaxTune', VarDescr='Whether to tune LB dynamic stall model', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='RelaxTune', VarDescr='Whether to tune LB dynamic stall model', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -737,14 +744,14 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
          END SELECT     
             
       !  Read in the time to start ds   
-   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%start_t , VarName='StartTime', VarDescr='time to start ds', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%start_t , VarName='StartTime', VarDescr='time to start ds', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF          
          
        ! Read in the Whether to load pre-calculated dynamic stall data
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='LoadData', VarDescr='Whether to load pre-calculated dynamic stall data', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='LoadData', VarDescr='Whether to load pre-calculated dynamic stall data', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -770,7 +777,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
     
    
       ! Selects File name for pre-calculated dynamic stall data
-   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%load_file , VarName='LoadData', VarDescr='File name for pre-calculated dynamic stall data', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%load_file , VarName='LoadData', VarDescr='File name for pre-calculated dynamic stall data', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -779,57 +786,57 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
 
        
       !  Read in indicial coefs, [A1,A2,b1,b2]  
-   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%indicial(1) , VarName='Indicial1', VarDescr='time to start ds', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%indicial(1) , VarName='Indicial1', VarDescr='time to start ds', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF          
    
-   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%indicial(2) , VarName='Indicial2', VarDescr='time to start ds', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%indicial(2) , VarName='Indicial2', VarDescr='time to start ds', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF    
    
-   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%indicial(3) , VarName='Indicial3', VarDescr='time to start ds', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%indicial(3) , VarName='Indicial3', VarDescr='time to start ds', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF 
    
-   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%indicial(4) , VarName='Indicial4', VarDescr='time to start ds', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%indicial(4) , VarName='Indicial4', VarDescr='time to start ds', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF    
    
       !  Read in time constants, [Tp,Tf,Tv,Tvl]  
-   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%time_const(1) , VarName='TimeConst1', VarDescr='time to start ds', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%time_const(1) , VarName='TimeConst1', VarDescr='time to start ds', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF          
    
-   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%time_const(2) , VarName='TimeConst2', VarDescr='time to start ds', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%time_const(2) , VarName='TimeConst2', VarDescr='time to start ds', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF   
    
-   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%time_const(3) , VarName='TimeConst3', VarDescr='time to start ds', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%time_const(3) , VarName='TimeConst3', VarDescr='time to start ds', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF  
    
-   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%time_const(4) , VarName='TimeConst4', VarDescr='time to start ds', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%DS_Parms%time_const(4) , VarName='TimeConst4', VarDescr='time to start ds', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF     
    
      ! Read in the Whether to write dynamic stall data to file
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='WriteData', VarDescr='Whether to write dynamic stall data to file', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='WriteData', VarDescr='Whether to write dynamic stall data to file', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -852,7 +859,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    !....................................................................
       ! Read in the "ANIMATION" part 
    !....................................................................   
-   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part8', VarDescr='ANIMATION', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part8', VarDescr='ANIMATION', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -860,7 +867,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
        ! Read in the Whether generate animation of wake evolution for Paraview
    CALL ReadVar( UnIn, FilePathName, LINE , VarName='AnimFLAG',                   &
-           VarDescr='Whether generate animation of wake evolution for Paraview', ErrStat=ErrStat)
+           VarDescr='Whether generate animation of wake evolution for Paraview', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -884,14 +891,14 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    !....................................................................
       ! Read in the "PARALLEL COMPUTING" part 
    !....................................................................   
-   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part9', VarDescr='Part9', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part9', VarDescr='Part9', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
    END IF 
    
        ! Read in the Whether use Treecode/FMM/GPU/OpenMP
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='Accelerate', VarDescr='Whether use Treecode/FMM/GPU/OpenMP', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='Accelerate', VarDescr='Whether use Treecode/FMM/GPU/OpenMP', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -912,7 +919,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
          
       
          ! Read in number of cores used in OpenMP
-   CALL ReadVar( UnIn, FilePathName, p%FVM%OpenMP_Parms%OpenMPCores , VarName='OpenMPCores', VarDescr='Number of OpenMP cores', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%OpenMP_Parms%OpenMPCores , VarName='OpenMPCores', VarDescr='Number of OpenMP cores', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -929,7 +936,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    !....................................................................
       ! Read in the "TREECODE ALGORITHM" part 
    !....................................................................   
-   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part10', VarDescr='Part10', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part10', VarDescr='Part10', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -937,7 +944,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
          
          
        ! Read in the Whether use Treecode
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='TreeFlag', VarDescr='Whether use Treecode', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='TreeFlag', VarDescr='Whether use Treecode', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -958,7 +965,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
          
        ! Read in the Whether test and record the speedup (flag)
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='Speedup', VarDescr='Whether test and record the speedup', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='Speedup', VarDescr='Whether test and record the speedup', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -994,7 +1001,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
          
          
         ! Read in the parameter for parallel treecode  ! Sliu: should remove this line
-   CALL ReadVar( UnIn, FilePathName, p%FVM%Tree_Parms%cores , VarName='Paralle', VarDescr='parallel treecode', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%Tree_Parms%cores , VarName='Paralle', VarDescr='parallel treecode', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -1009,7 +1016,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
          
        ! Read in the theta (open box angle)
    CALL ReadVar( UnIn, FilePathName, p%FVM%Tree_Parms%theta , VarName='OpenAngle',                      &
-              VarDescr='Theta (open box angle)', ErrStat=ErrStat)
+              VarDescr='Theta (open box angle)', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -1023,7 +1030,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
    
        ! Read in the Taylor expansion order
-   CALL ReadVar( UnIn, FilePathName, p%FVM%Tree_Parms%order , VarName='TaylorOrder', VarDescr='TaylorOrder', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%Tree_Parms%order , VarName='TaylorOrder', VarDescr='TaylorOrder', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -1038,7 +1045,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
       
    
        ! Read in the Maxparnode: Max particle quantity in one leaf
-   CALL ReadVar( UnIn, FilePathName, p%FVM%Tree_Parms%maxparnode , VarName='Maxparnode', VarDescr='Max particle quantity in one leaf', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, p%FVM%Tree_Parms%maxparnode , VarName='Maxparnode', VarDescr='Max particle quantity in one leaf', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -1052,7 +1059,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
        ! Read in the Dist_tol: Ignored beyond this distance
    CALL ReadVar( UnIn, FilePathName, p%FVM%Tree_Parms%dist_tol , VarName='Dist_tol',                      &
-              VarDescr='Ignored beyond this distance', ErrStat=ErrStat)
+              VarDescr='Ignored beyond this distance', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -1060,7 +1067,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
        ! Read in the Delta: Smoothing parameter
    CALL ReadVar( UnIn, FilePathName, p%FVM%Tree_Parms%delta , VarName='Delta',                      &
-              VarDescr='Smoothing parameter', ErrStat=ErrStat)
+              VarDescr='Smoothing parameter', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -1077,7 +1084,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    !....................................................................
       ! Read in the "OUTPUT" part 
    !....................................................................   
-   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part11', VarDescr='Part11', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE, VarName='Part11', VarDescr='Part11', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -1085,7 +1092,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
    
        ! Read in the Whether to write Cl, Cd,  AOA and V_tot of each blade element
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='Element', VarDescr='Whether to write blade elment', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='Element', VarDescr='Whether to write blade elment', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -1106,7 +1113,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    
    
        ! Read in the Whether to write convergence of Kutta Joukowski subroutine
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='KJCoverg', VarDescr='Whether to write convergence of Kutta Joukowski subroutine', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='KJCoverg', VarDescr='Whether to write convergence of Kutta Joukowski subroutine', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -1127,7 +1134,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
          
          
        ! Read in the Whether to write summary
-   CALL ReadVar( UnIn, FilePathName, LINE , VarName='SumPrint', VarDescr='Whether to write summary', ErrStat=ErrStat)
+   CALL ReadVar( UnIn, FilePathName, LINE , VarName='SumPrint', VarDescr='Whether to write summary', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    IF ( ErrStat /= ErrID_None )  THEN
       ErrMess = ' Error (in WInDS): Error occured when reading input file for WInDS. Please check.'
       RETURN   
@@ -1149,7 +1156,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
 
       
    !    ! Read in the 
-   !CALL ReadVar( UnIn, FilePathName,  , VarName='', VarDescr='', ErrStat=ErrStat)
+   !CALL ReadVar( UnIn, FilePathName,  , VarName='', VarDescr='', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
    !IF ( ErrStat /= ErrID_None ) RETURN    
    
   
@@ -1158,7 +1165,7 @@ SUBROUTINE WInDS_ReadInput(InitInp, P, xd, O, ErrStat, ErrMess )
    !-------------------------------------------------------------------------------------------------
    CLOSE(UnIn)   
            
-END SUBROUTINE WInDS_ReadInput
+END SUBROUTINE ReadInputWInDS
 !====================================================================================================
 SUBROUTINE Initialize_paraview_files(P, xd,  O, ErrStat, ErrMess )
 ! Initialize Paraview files
@@ -1248,7 +1255,7 @@ SUBROUTINE Initialize_paraview_files(P, xd,  O, ErrStat, ErrMess )
 
 END SUBROUTINE Initialize_paraview_files
 !====================================================================================================
-SUBROUTINE CreateVTUembedded(IBlade, filename, P, xd, O, ErrStat, ErrMess )
+SUBROUTINE CreateVTUembedded15(IBlade, filename, P, xd, O, ErrStat, ErrMess )
 ! Write Paraview file at each WInDS timestep
 !................................................................................................... 
     IMPLICIT                      NONE
@@ -1453,7 +1460,7 @@ SUBROUTINE CreateVTUembedded(IBlade, filename, P, xd, O, ErrStat, ErrMess )
    
    
 
-END SUBROUTINE CreateVTUembedded 
+END SUBROUTINE CreateVTUembedded15 
 !====================================================================================================
 SUBROUTINE Close_paraview_files(P, xd, O, ErrStat, ErrMess )
 !...................................................................................................    
@@ -1513,204 +1520,205 @@ SUBROUTINE LB_load_AirfoilData(p, O, xd, ErrStat, ErrMess)
    INTEGER             :: UnIn                 ! Logical unit for the input file.
    CHARACTER(1024)     :: LINE
    CHARACTER(1024)     :: FilePathName         ! The whole path of WInDS input file + Name
-   
+   integer(IntKi)      :: UnEc                                ! I/O unit for echo file. If > 0, file is open for writing.
+ 
    !LOGICAL             :: TEST1, TEST2
    !INTEGER             :: I
    
    
       ! Function definition      
    UnIn = 200    ! Some number for index of the file
-   
+   UnEc = -1   
    !-------------------------------------------------------------------------------------------------
    ! Open the WInDS input file  
    !-------------------------------------------------------------------------------------------------
    FilePathName    = TRIM(p%FVM%WINDS_dir)// TRIM(p%FVM%DS_Parms%load_file)
    
-   CALL OpenFInpFile(UnIn, TRIM(FilePathName), ErrStat)   ! This routine opens a formatted input file. OpenFInpFile is defined in NWTC_IO.f90
+   CALL OpenFInpFile(UnIn, TRIM(FilePathName), ErrStat, ErrMess)   ! This routine opens a formatted input file. OpenFInpFile is defined in NWTC_IO.f90
    IF (ErrStat /= ErrID_None ) THEN
       ErrMess = ' Error (in WInDS): Cannot find/open the dynamic stall data file for WInDS under path:"' //TRIM(FilePathName)//   &
                  '". Please check. Otherwise, please change "LoadData" option to be True.'   
       RETURN
    END IF
    
-   DO NFOILID = 1, P%AirFoil%NumFoil
+   DO NFOILID = 1, P%AirFoil_NumFoil   ! InputFileData%NumAFfiles
         ! Read in the airfoil name
-        CALL ReadVar( UnIn, FilePathName, LINE, VarName='Title', VarDescr='File title', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, LINE, VarName='Title', VarDescr='File title', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
            ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS. Please check.'
            RETURN   
         END IF          
       
         ! Read in A1
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%A1(NFOILID), VarName='A1', VarDescr='A1', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%A1(NFOILID), VarName='A1', VarDescr='A1', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (A1). Please check.'
             RETURN   
         END IF       
       
         ! Read in A2
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%A2(NFOILID), VarName='A2', VarDescr='A2', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%A2(NFOILID), VarName='A2', VarDescr='A2', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (A2). Please check.'
             RETURN   
         END IF            
       
         ! Read in b1
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%b1(NFOILID), VarName='b1', VarDescr='b1', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%b1(NFOILID), VarName='b1', VarDescr='b1', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (b1). Please check.'
             RETURN   
         END IF      
         
         ! Read in  b2
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%b2(NFOILID), VarName='b2', VarDescr='b2', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%b2(NFOILID), VarName='b2', VarDescr='b2', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (b2). Please check.'
             RETURN   
         END IF            
       
         ! Read in Tp
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%Tp(NFOILID), VarName='Tp', VarDescr='Tp', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%Tp(NFOILID), VarName='Tp', VarDescr='Tp', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (Tp). Please check.'
             RETURN   
         END IF    
       
         ! Read in Tf
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%Tf(NFOILID), VarName='Tf', VarDescr='Tf', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%Tf(NFOILID), VarName='Tf', VarDescr='Tf', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (Tf). Please check.'
             RETURN   
         END IF            
       
         ! Read in Tv
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%Tv(NFOILID), VarName='Tv', VarDescr='Tv', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%Tv(NFOILID), VarName='Tv', VarDescr='Tv', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (Tv). Please check.'
             RETURN   
         END IF      
         
         ! Read in Tvl
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%Tvl(NFOILID), VarName='Tvl', VarDescr='Tvl', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%Tvl(NFOILID), VarName='Tvl', VarDescr='Tvl', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (Tvl). Please check.'
             RETURN   
         END IF            
       
         ! Read in Cn_alpha
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%Cn_alpha(NFOILID), VarName='Cn_alpha', VarDescr='Cn_alpha', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%Cn_alpha(NFOILID), VarName='Cn_alpha', VarDescr='Cn_alpha', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (Cn_alpha). Please check.'
             RETURN   
         END IF      
                        
         ! Read in Alpha_0
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%Alpha_0(NFOILID), VarName='Alpha_0', VarDescr='Alpha_0', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%Alpha_0(NFOILID), VarName='Alpha_0', VarDescr='Alpha_0', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (Alpha_0). Please check.'
             RETURN   
         END IF            
       
         ! Read in C_d_0
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%C_d_0(NFOILID), VarName='C_d_0', VarDescr='C_d_0', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%C_d_0(NFOILID), VarName='C_d_0', VarDescr='C_d_0', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (C_d_0). Please check.'
             RETURN   
         END IF      
         
         ! Read in C_m_0
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%C_m_0(NFOILID), VarName='C_m_0', VarDescr='C_m_0', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%C_m_0(NFOILID), VarName='C_m_0', VarDescr='C_m_0', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (C_m_0). Please check.'
             RETURN   
         END IF            
       
         ! Read in C_n_0
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%C_n_0(NFOILID), VarName='C_n_0', VarDescr='C_n_0', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%C_n_0(NFOILID), VarName='C_n_0', VarDescr='C_n_0', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (C_n_0). Please check.'
             RETURN   
         END IF    
       
         ! Read in alpha_1
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%alpha_1(NFOILID), VarName='alpha_1', VarDescr='alpha_1', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%alpha_1(NFOILID), VarName='alpha_1', VarDescr='alpha_1', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (alpha_1). Please check.'
             RETURN   
         END IF            
       
         ! Read in  alpha_2
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%alpha_2(NFOILID), VarName='alpha_2', VarDescr='alpha_2', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%alpha_2(NFOILID), VarName='alpha_2', VarDescr='alpha_2', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (alpha_2). Please check.'
             RETURN   
         END IF      
         
         ! Read in a(1)
-        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%a(NFOILID, 1), VarName='a(1)', VarDescr='a(1)', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%a(NFOILID, 1), VarName='a(1)', VarDescr='a(1)', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (a(1)). Please check.'
             RETURN   
         END IF            
         
         ! Read in a(2)
-        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%a(NFOILID, 2), VarName='a(2)', VarDescr='a(2)', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%a(NFOILID, 2), VarName='a(2)', VarDescr='a(2)', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (a(2)). Please check.'
             RETURN   
         END IF     
         
         ! Read in a(3)
-        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%a(NFOILID, 3), VarName='a(3)', VarDescr='a(3)', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%a(NFOILID, 3), VarName='a(3)', VarDescr='a(3)', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (a(3)). Please check.'
             RETURN   
         END IF             
 
         ! Read in S(1)
-        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%S(NFOILID, 1), VarName='S(1)', VarDescr='S(1)', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%S(NFOILID, 1), VarName='S(1)', VarDescr='S(1)', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (S(1)). Please check.'
             RETURN   
         END IF            
         
         ! Read in S(2)
-        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%S(NFOILID, 2), VarName='S(2)', VarDescr='S(2)', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%S(NFOILID, 2), VarName='S(2)', VarDescr='S(2)', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (S(2)). Please check.'
             RETURN   
         END IF     
         
         ! Read in S(3)
-        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%S(NFOILID, 3), VarName='S(3)', VarDescr='S(3)', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%S(NFOILID, 3), VarName='S(3)', VarDescr='S(3)', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (S(3)). Please check.'
             RETURN   
         END IF                     
         
         ! Read in c(1)
-        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%c(NFOILID, 1), VarName='c(1)', VarDescr='c(1)', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%c(NFOILID, 1), VarName='c(1)', VarDescr='c(1)', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (c(1)). Please check.'
             RETURN   
         END IF            
         
         ! Read in c(2)
-        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%c(NFOILID, 2), VarName='c(2)', VarDescr='c(2)', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%c(NFOILID, 2), VarName='c(2)', VarDescr='c(2)', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (c(2)). Please check.'
             RETURN   
         END IF     
         
         ! Read in c(3)
-        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%c(NFOILID, 3), VarName='c(3)', VarDescr='c(3)', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName,  O%FVM_Other%airfoils_LB%c(NFOILID, 3), VarName='c(3)', VarDescr='c(3)', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (c(3)). Please check.'
             RETURN   
         END IF     
         
         ! Read in recovery_factor
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%recovery_factor(NFOILID), VarName='recovery_factor', VarDescr='recovery_factor', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%recovery_factor(NFOILID), VarName='recovery_factor', VarDescr='recovery_factor', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (recovery_factor). Please check.'
             RETURN   
@@ -1718,21 +1726,21 @@ SUBROUTINE LB_load_AirfoilData(p, O, xd, ErrStat, ErrMess)
       
       
         ! Read in C_n_2
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%C_n_2(NFOILID), VarName='C_n_2', VarDescr='C_n_2', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%C_n_2(NFOILID), VarName='C_n_2', VarDescr='C_n_2', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (C_n_2). Please check.'
             RETURN   
         END IF      
         
         ! Read in C_n_1
-        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%C_n_1(NFOILID), VarName='C_n_1', VarDescr='C_n_1', ErrStat=ErrStat)
+        CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%C_n_1(NFOILID), VarName='C_n_1', VarDescr='C_n_1', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         IF ( ErrStat /= ErrID_None )  THEN
             ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (C_n_1). Please check.'
             RETURN   
         END IF            
         
         !! Read in ca_K1
-        !CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%C_n_1(NFOILID), VarName='ca_K1', VarDescr='ca_K1', ErrStat=ErrStat)
+        !CALL ReadVar( UnIn, FilePathName, O%FVM_Other%airfoils_LB%C_n_1(NFOILID), VarName='ca_K1', VarDescr='ca_K1', ErrStat=ErrStat, ErrMsg=ErrMess, UnEc=UnEc)
         !IF ( ErrStat /= ErrID_None )  THEN
         !    ErrMess = ' Error (in WInDS): Error occured when reading Dynamic Stall data file for WInDS (ca_K1). Please check.'
         !    RETURN   
@@ -1797,14 +1805,16 @@ SUBROUTINE Write_DS_parameters(p, O, ErrStat, ErrMess)
 
        
    
-   DO NFOILID = 1, P%AirFoil%NumFoil
-       Check_name =  INDEX((p%AirFoil%FOILNM(NFOILID)), "AeroData") 
+   DO NFOILID = 1, P%AirFoil_NumFoil
+       Check_name =  INDEX((p%AirFoil_FOILNM(NFOILID)), "AeroData")   ! sliu
        IF (Check_name >=1) THEN  
-          LINE =  'AirFoil Name: ' // TRIM(p%AirFoil%FOILNM(NFOILID)(Check_name+9:)) // '-------------------'  ! Just leave the airfoil file name, delete the path
+          LINE =  'AirFoil Name: ' // TRIM(p%AirFoil_FOILNM(NFOILID)(Check_name+9:)) // '-------------------'  ! Just leave the airfoil file name, delete the path
        ELSE
-          LINE =  'AirFoil Name: ' // TRIM(p%AirFoil%FOILNM(NFOILID)) // '-----------------------------------' ! Airfoil file name with the path
+          LINE =  'AirFoil Name: ' // TRIM(p%AirFoil_FOILNM(NFOILID)) // '-----------------------------------' ! Airfoil file name with the path
        END IF
        WRITE(30, "(A)") (TRIM(LINE))
+       
+       WRITE(30, "(A)") ('-----------------------------------')
        
        WRITE(TEMP1, "(F13.8)") ( O%FVM_Other%airfoils_LB%Cn_alpha(NFOILID) ) 
        LINE = TRIM(TEMP1)  // ' - Cn_alpha'      
@@ -2168,9 +2178,9 @@ SUBROUTINE WInDS_WriteSum(P, xd, O, ErrStat, ErrMess )
       WRITE(40, "(A)") ('...........................................................................')
       WRITE(40, "(A)") ('Simplified wake model:')      
       WRITE(40, "(A)")  ('')   
-      WRITE(40, "(A)") (' Cutoff after: '//TRIM( Num2LStr( p%FVM%WakeDist/ p%Blade%TipRadius/2  ))//' Diameter' )        
+      WRITE(40, "(A)") (' Cutoff after: '//TRIM( Num2LStr( p%FVM%WakeDist/ p%Blade_TipRadius/2  ))//' Diameter' )        
       WRITE(40, "(A)") (' Cutoff after: '//TRIM( Num2LStr( p%FVM%WakeNum))//' timesteps' ) 
-      WRITE(40, "(A)") (' Freeze after: '//TRIM( Num2LStr( p%FVM%RollDist/ p%Blade%TipRadius/2 ))//' Diameter' )     
+      WRITE(40, "(A)") (' Freeze after: '//TRIM( Num2LStr( p%FVM%RollDist/ p%Blade_TipRadius/2 ))//' Diameter' )     
       WRITE(40, "(A)") (' Freeze after: '//TRIM( Num2LStr( O%FVM_Other%ntroll))//' timesteps' )
 
       
@@ -2343,5 +2353,5 @@ SUBROUTINE WRITE_KJ(Iteration, Timestep,  DG_MAX, CALLER, p)
 END SUBROUTINE WRITE_KJ
 !====================================================================================================
 
-END MODULE WINDS_IO
+END MODULE WINDS_IO_15
 !**********************************************************************************************************************************   

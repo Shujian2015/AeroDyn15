@@ -7,7 +7,7 @@
 !..................................................................................................
     
 
-MODULE WINDS_Accelerate   
+MODULE WINDS_Accelerate_15   
 
    use OMP_LIB      ! OpenMP
    USE NWTC_Library
@@ -381,5 +381,5 @@ END SUBROUTINE BiotSavart_TEST
               
                            
                            
-END MODULE WINDS_Accelerate
+END MODULE WINDS_Accelerate_15
 !**********************************************************************************************************************************    

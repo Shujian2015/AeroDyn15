@@ -1,4 +1,4 @@
-MODULE WINDS_DS
+MODULE WINDS_DS_15
    ! Reference: 
    !     Gaertner, Evan M., "Modeling Dynamic Stall for a Free Vortex Wake Model of a Floating Offshore Wind Turbine" (2014).
    !     Masters Theses May 2014-current. Paper 85.
@@ -6,8 +6,8 @@ MODULE WINDS_DS
     
    USE NWTC_Library 
    USE AeroDyn_Types
-   USE WINDS_IO          ! Handle input and output
-   !USE WINDS_Library    ! Some subroutines for debug
+   USE WINDS_IO_15          ! Handle input and output
+   !USE WINDS_Library_15    ! Some subroutines for debug
 
    
    ! Sliu: problem for NTables
@@ -53,12 +53,13 @@ SUBROUTINE LB_Initialize_Variables(p, O, xd, ErrStat, ErrMess)
    ErrStat = ErrID_None
    ErrMess  = ""
    
+
       
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
-   NB  = p%NumBl
-   NF  = P%AirFoil%NumFoil
-   NumCl = P%AirFoil%NumCl ! the maximum number of lines (for only the data such as AOA or Cl) across all files
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
+   NB  = p%numBlades
+   NF  = P%AirFoil_NumFoil
+   NumCl = P%AirFoil_NumCl ! the maximum number of lines (for only the data such as AOA or Cl) across all files
 
    
    
@@ -215,8 +216,8 @@ SUBROUTINE LB_Initialize_Variables(p, O, xd, ErrStat, ErrMess)
    O%FVM_Other%airfoils_LB%Tv  = 0.0_DbKi 
    O%FVM_Other%airfoils_LB%Tvl = 0.0_DbKi    
    
-   IF (.NOT. ALLOCATED( O%FVM_Other%airfoils_LB%cn ) )         ALLOCATE( O%FVM_Other%airfoils_LB%cn(NF, p%AirFoil%NumCL))    ! NumCL: the maximum number of lines (for only the data such as AOA or Cl) across all files
-   IF (.NOT. ALLOCATED( O%FVM_Other%airfoils_LB%ca ) )         ALLOCATE( O%FVM_Other%airfoils_LB%ca(NF, p%AirFoil%NumCL)) 
+   IF (.NOT. ALLOCATED( O%FVM_Other%airfoils_LB%cn ) )         ALLOCATE( O%FVM_Other%airfoils_LB%cn(NF, p%AirFoil_NumCL))    ! NumCL: the maximum number of lines (for only the data such as AOA or Cl) across all files
+   IF (.NOT. ALLOCATED( O%FVM_Other%airfoils_LB%ca ) )         ALLOCATE( O%FVM_Other%airfoils_LB%ca(NF, p%AirFoil_NumCL)) 
    IF (.NOT. ALLOCATED( O%FVM_Other%airfoils_LB%Cn_alpha ) )   ALLOCATE( O%FVM_Other%airfoils_LB%Cn_alpha(NF)) 
    IF (.NOT. ALLOCATED( O%FVM_Other%airfoils_LB%Alpha_0 ) )    ALLOCATE( O%FVM_Other%airfoils_LB%Alpha_0(NF))    
    IF (.NOT. ALLOCATED( O%FVM_Other%airfoils_LB%C_d_0 ) )      ALLOCATE( O%FVM_Other%airfoils_LB%C_d_0(NF))    
@@ -317,7 +318,7 @@ SUBROUTINE LB_Initialize_AirfoilData(p, O, xd, ErrStat, ErrMess)
    INTEGER(IntKi)      :: naf
    INTEGER(IntKi)      :: NFOILID, J, K, M
    INTEGER(IntKi)      :: nAoA 
-   REAL(DbKi), dimension(P%AirFoil%NumCL)   :: Cn_temp
+   REAL(DbKi), dimension(P%AirFoil_NumCL)   :: Cn_temp
    INTEGER(IntKi)      :: Check_name
    
    !REAL(DbKi)          :: StallAoA
@@ -333,19 +334,19 @@ SUBROUTINE LB_Initialize_AirfoilData(p, O, xd, ErrStat, ErrMess)
       
    !StallAoA = pi/12  ! Sliu: Not correct
    
-   NST = p%Element%NElm + 1
-   NS  = p%Element%NElm
-   NB  = p%NumBl
+   NST = p%NumBlNds + 1
+   NS  = p%NumBlNds
+   NB  = p%numBlades
    
    
 
-   DO NFOILID = 1, P%AirFoil%NumFoil
-      IF (P%AirFoil%NTables(NFOILID) > 1) THEN 
-         ErrMess = ' WInDS error: Currently WInDS does not support multi-column airfoil file.'
-         ErrStat = ErrID_Fatal
-         RETURN   
-      ELSE  
-         Check_name =  INDEX((p%AirFoil%FOILNM(NFOILID)), "Cylinder") 
+   DO NFOILID = 1, P%AirFoil_NumFoil
+      !IF (P%AirFoil%NTables(NFOILID) > 1) THEN   ! sliu
+      !   ErrMess = ' WInDS error: Currently WInDS does not support multi-column airfoil file.'
+      !   ErrStat = ErrID_Fatal
+      !   RETURN   
+      !ELSE  
+         Check_name =  INDEX((p%AirFoil_FOILNM(NFOILID)), "Cylinder") 
          IF (Check_name == 0) THEN ! Not "Cylinder"
             O%FVM_Other%airfoils_LB%A1(NFOILID)  = p%FVM%DS_Parms%indicial(1)
             O%FVM_Other%airfoils_LB%A2(NFOILID)  = p%FVM%DS_Parms%indicial(2) 
@@ -439,7 +440,7 @@ SUBROUTINE LB_Initialize_AirfoilData(p, O, xd, ErrStat, ErrMess)
             
             
          END IF ! NOT "Cylinder"   
-      END IF ! (P%AirFoil%NTables(NFOILID) > 1) 
+      !END IF ! (P%AirFoil%NTables(NFOILID) > 1) 
    END DO !  
    
    
@@ -1754,4 +1755,4 @@ FUNCTION interp1D_3(X,Y,vx)
 END FUNCTION  interp1D_3
 !==================================================================================================================================    
     
-END MODULE WINDS_DS    
+END MODULE WINDS_DS_15    

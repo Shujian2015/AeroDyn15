@@ -30,6 +30,9 @@ module AeroDyn
    use AirfoilInfo
    use NWTC_LAPACK
    
+   !! UMass
+   use WINDS_15  ! free vortex method WInDS by Umass WEC
+   !! Umass
    
    implicit none
 
@@ -283,7 +286,28 @@ subroutine AD_Init( InitInp, u, p, x, xd, z, OtherState, y, Interval, InitOut, E
          
    !end if      
       
-      
+    
+         
+      !............................................................................................
+      ! Initialize the WInDS module  (Umass WEC)
+      !............................................................................................         
+   ! if   then   ! use WInDS for aerodynamic calculation
+         
+      call WINDS_Init( InputFileData, u, OtherState%WINDS_u, p, x%WINDS, xd%WINDS, z%WINDS, &
+                            OtherState%WINDS, OtherState%WINDS_y, ErrStat2, ErrMsg2 )
+         !call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName ) 
+         !if (ErrStat >= AbortErrLev) then
+         !   call Cleanup()
+         !   return
+         !end if         
+         
+    ! end if     
+         
+         
+         
+         
+         
+         
       !............................................................................................
       ! Define outputs here
       !............................................................................................
@@ -832,7 +856,13 @@ subroutine AD_End( u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )
       ErrStat = ErrID_None
       ErrMsg  = ""
 
-
+      
+      
+      !!! Umass ....
+      CALL WINDS_End( t, u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )      
+      !!! Umass ...
+      
+      
          ! Place any last minute operations or calculations here:
 
 

@@ -546,9 +546,14 @@ IMPLICIT NONE
     INTEGER(IntKi) , DIMENSION(1:9)  :: TwOutNd      ! Tower nodes whose values will be output [-]
     TYPE(FVMParmsTYPE)  :: FVM 
     INTEGER(IntKi)  :: n_TMax_m1      ! The time step of TMax - dt (the end time of the simulation) [-]
+    REAL(DbKi)  :: Blade_TipRadius 
+    REAL(DbKi)  :: Blade_HubRadius 
     REAL(DbKi) , DIMENSION(:), ALLOCATABLE  :: Blade_RTrail 
     REAL(DbKi) , DIMENSION(:), ALLOCATABLE  :: Blade_RNodes      ! sum P%Blade%DR [-]
     REAL(DbKi) , DIMENSION(:), ALLOCATABLE  :: Blade_AeroCen      ! The relative location of aerodynamic center [-]
+    INTEGER(IntKi)  :: AirFoil_NumFoil      ! NumAFfiles [-]
+    INTEGER(IntKi)  :: AirFoil_NumCL 
+    CHARACTER(1024) , DIMENSION(:), ALLOCATABLE  :: AirFoil_FoilNm 
   END TYPE AD_ParameterType
 ! =======================
 ! =========  AD_InputType  =======
@@ -22783,6 +22788,8 @@ ENDIF
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
          IF (ErrStat>=AbortErrLev) RETURN
     DstParamData%n_TMax_m1 = SrcParamData%n_TMax_m1
+    DstParamData%Blade_TipRadius = SrcParamData%Blade_TipRadius
+    DstParamData%Blade_HubRadius = SrcParamData%Blade_HubRadius
 IF (ALLOCATED(SrcParamData%Blade_RTrail)) THEN
   i1_l = LBOUND(SrcParamData%Blade_RTrail,1)
   i1_u = UBOUND(SrcParamData%Blade_RTrail,1)
@@ -22819,6 +22826,20 @@ IF (ALLOCATED(SrcParamData%Blade_AeroCen)) THEN
   END IF
     DstParamData%Blade_AeroCen = SrcParamData%Blade_AeroCen
 ENDIF
+    DstParamData%AirFoil_NumFoil = SrcParamData%AirFoil_NumFoil
+    DstParamData%AirFoil_NumCL = SrcParamData%AirFoil_NumCL
+IF (ALLOCATED(SrcParamData%AirFoil_FoilNm)) THEN
+  i1_l = LBOUND(SrcParamData%AirFoil_FoilNm,1)
+  i1_u = UBOUND(SrcParamData%AirFoil_FoilNm,1)
+  IF (.NOT. ALLOCATED(DstParamData%AirFoil_FoilNm)) THEN 
+    ALLOCATE(DstParamData%AirFoil_FoilNm(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+      CALL SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%AirFoil_FoilNm.', ErrStat, ErrMsg,RoutineName)
+      RETURN
+    END IF
+  END IF
+    DstParamData%AirFoil_FoilNm = SrcParamData%AirFoil_FoilNm
+ENDIF
  END SUBROUTINE AD_CopyParam
 
  SUBROUTINE AD_DestroyParam( ParamData, ErrStat, ErrMsg )
@@ -22853,6 +22874,9 @@ IF (ALLOCATED(ParamData%Blade_RNodes)) THEN
 ENDIF
 IF (ALLOCATED(ParamData%Blade_AeroCen)) THEN
   DEALLOCATE(ParamData%Blade_AeroCen)
+ENDIF
+IF (ALLOCATED(ParamData%AirFoil_FoilNm)) THEN
+  DEALLOCATE(ParamData%AirFoil_FoilNm)
 ENDIF
  END SUBROUTINE AD_DestroyParam
 
@@ -22994,6 +23018,8 @@ ENDIF
          DEALLOCATE(Int_Buf)
       END IF
       Int_BufSz  = Int_BufSz  + 1  ! n_TMax_m1
+      Db_BufSz   = Db_BufSz   + 1  ! Blade_TipRadius
+      Db_BufSz   = Db_BufSz   + 1  ! Blade_HubRadius
   Int_BufSz   = Int_BufSz   + 1     ! Blade_RTrail allocated yes/no
   IF ( ALLOCATED(InData%Blade_RTrail) ) THEN
     Int_BufSz   = Int_BufSz   + 2*1  ! Blade_RTrail upper/lower bounds for each dimension
@@ -23008,6 +23034,13 @@ ENDIF
   IF ( ALLOCATED(InData%Blade_AeroCen) ) THEN
     Int_BufSz   = Int_BufSz   + 2*1  ! Blade_AeroCen upper/lower bounds for each dimension
       Db_BufSz   = Db_BufSz   + SIZE(InData%Blade_AeroCen)  ! Blade_AeroCen
+  END IF
+      Int_BufSz  = Int_BufSz  + 1  ! AirFoil_NumFoil
+      Int_BufSz  = Int_BufSz  + 1  ! AirFoil_NumCL
+  Int_BufSz   = Int_BufSz   + 1     ! AirFoil_FoilNm allocated yes/no
+  IF ( ALLOCATED(InData%AirFoil_FoilNm) ) THEN
+    Int_BufSz   = Int_BufSz   + 2*1  ! AirFoil_FoilNm upper/lower bounds for each dimension
+      Int_BufSz  = Int_BufSz  + SIZE(InData%AirFoil_FoilNm)*LEN(InData%AirFoil_FoilNm)  ! AirFoil_FoilNm
   END IF
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
@@ -23225,6 +23258,10 @@ ENDIF
       ENDIF
       IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%n_TMax_m1
       Int_Xferred   = Int_Xferred   + 1
+      DbKiBuf ( Db_Xferred:Db_Xferred+(1)-1 ) = InData%Blade_TipRadius
+      Db_Xferred   = Db_Xferred   + 1
+      DbKiBuf ( Db_Xferred:Db_Xferred+(1)-1 ) = InData%Blade_HubRadius
+      Db_Xferred   = Db_Xferred   + 1
   IF ( .NOT. ALLOCATED(InData%Blade_RTrail) ) THEN
     IntKiBuf( Int_Xferred ) = 0
     Int_Xferred = Int_Xferred + 1
@@ -23263,6 +23300,27 @@ ENDIF
 
       IF (SIZE(InData%Blade_AeroCen)>0) DbKiBuf ( Db_Xferred:Db_Xferred+(SIZE(InData%Blade_AeroCen))-1 ) = PACK(InData%Blade_AeroCen,.TRUE.)
       Db_Xferred   = Db_Xferred   + SIZE(InData%Blade_AeroCen)
+  END IF
+      IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%AirFoil_NumFoil
+      Int_Xferred   = Int_Xferred   + 1
+      IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%AirFoil_NumCL
+      Int_Xferred   = Int_Xferred   + 1
+  IF ( .NOT. ALLOCATED(InData%AirFoil_FoilNm) ) THEN
+    IntKiBuf( Int_Xferred ) = 0
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    IntKiBuf( Int_Xferred ) = 1
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%AirFoil_FoilNm,1)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%AirFoil_FoilNm,1)
+    Int_Xferred = Int_Xferred + 2
+
+    DO i1 = LBOUND(InData%AirFoil_FoilNm,1), UBOUND(InData%AirFoil_FoilNm,1)
+        DO I = 1, LEN(InData%AirFoil_FoilNm)
+          IntKiBuf(Int_Xferred) = ICHAR(InData%AirFoil_FoilNm(i1)(I:I), IntKi)
+          Int_Xferred = Int_Xferred   + 1
+        END DO ! I
+    END DO !i1
   END IF
  END SUBROUTINE AD_PackParam
 
@@ -23577,6 +23635,10 @@ ENDIF
       IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
       OutData%n_TMax_m1 = IntKiBuf( Int_Xferred ) 
       Int_Xferred   = Int_Xferred + 1
+      OutData%Blade_TipRadius = DbKiBuf( Db_Xferred ) 
+      Db_Xferred   = Db_Xferred + 1
+      OutData%Blade_HubRadius = DbKiBuf( Db_Xferred ) 
+      Db_Xferred   = Db_Xferred + 1
   IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! Blade_RTrail not allocated
     Int_Xferred = Int_Xferred + 1
   ELSE
@@ -23644,6 +23706,37 @@ ENDIF
     mask1 = .TRUE. 
       IF (SIZE(OutData%Blade_AeroCen)>0) OutData%Blade_AeroCen = UNPACK(DbKiBuf( Db_Xferred:Db_Xferred+(SIZE(OutData%Blade_AeroCen))-1 ), mask1, 0.0_DbKi )
       Db_Xferred   = Db_Xferred   + SIZE(OutData%Blade_AeroCen)
+    DEALLOCATE(mask1)
+  END IF
+      OutData%AirFoil_NumFoil = IntKiBuf( Int_Xferred ) 
+      Int_Xferred   = Int_Xferred + 1
+      OutData%AirFoil_NumCL = IntKiBuf( Int_Xferred ) 
+      Int_Xferred   = Int_Xferred + 1
+  IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! AirFoil_FoilNm not allocated
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    Int_Xferred = Int_Xferred + 1
+    i1_l = IntKiBuf( Int_Xferred    )
+    i1_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    IF (ALLOCATED(OutData%AirFoil_FoilNm)) DEALLOCATE(OutData%AirFoil_FoilNm)
+    ALLOCATE(OutData%AirFoil_FoilNm(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating OutData%AirFoil_FoilNm.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+    END IF
+    ALLOCATE(mask1(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating mask1.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+    END IF
+    mask1 = .TRUE. 
+    DO i1 = LBOUND(OutData%AirFoil_FoilNm,1), UBOUND(OutData%AirFoil_FoilNm,1)
+        DO I = 1, LEN(OutData%AirFoil_FoilNm)
+          OutData%AirFoil_FoilNm(i1)(I:I) = CHAR(IntKiBuf(Int_Xferred))
+          Int_Xferred = Int_Xferred   + 1
+        END DO ! I
+    END DO !i1
     DEALLOCATE(mask1)
   END IF
  END SUBROUTINE AD_UnPackParam
