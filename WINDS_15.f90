@@ -68,11 +68,10 @@ CONTAINS
     
     
 !==================================================================================================================================
-SUBROUTINE WINDS_Init(InputFileData, u_AD, u, p, x, xd, z, O, y, ErrStat, ErrMess)
+SUBROUTINE WINDS_Init(InputFileData, u_AD, p, x, xd, z, O, y, ErrStat, ErrMess)
 
    type(AD_InputFile),          intent(in   ) :: InputFileData  ! All the data in the AeroDyn input file
    type(AD_InputType),          intent(in   ) :: u_AD           ! AD inputs - used for input mesh node positions
-   type(AD_InputType),          intent(  out) :: u              ! An initial guess for the input; input mesh must be defined
    type(AD_ParameterType),      intent(inout) :: p              ! Parameters ! intent out b/c we set the WINDS parameters here
    type(AD_ContinuousStateType),intent(  out) :: x              ! Initial continuous states
    type(AD_DiscreteStateType),  intent(  out) :: xd             ! Initial discrete states
@@ -283,8 +282,9 @@ SUBROUTINE WINDS_CalcOutput( time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
       END DO
    END DO
    
-         
-   
+   ! sliu: move this later      
+   O%Rotor_REVS   = dot_product( u%HubMotion%RotationVel(:,1), u%HubMotion%Orientation(1,:,1) )      ! OtherState%BEMT_u%omega (subroutine BEMT_SetParameters in AeroDyn.f90) -> REVS: Rotor rotational speed (i.e. RPM in rad/sec)
+
 
    !
    ! The WINDS main part:
@@ -309,7 +309,7 @@ SUBROUTINE WINDS_CalcOutput( time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
             CALL WINDS_Velocity(u, p, O, xd, O%WINDS_Timestep, ErrStat, ErrMess)    
             IF (ErrStat /= 0 ) RETURN
             
-            CALL WINDS_FVMInitial(u, p, O, xd, ErrStat, ErrMess, x, z, y)   !  "initials" in WInDS            
+            CALL WINDS_Initial(u, p, O, xd, ErrStat, ErrMess, x, z, y)   !  "initials" in WInDS            
             IF (ErrStat /= 0 ) RETURN
             
             DO IBlade=1, p%numBlades
@@ -681,6 +681,8 @@ SUBROUTINE WINDS_SetParameters( u_AD, InputFileData, p, O, ErrStat, ErrMess )
    REAL(DbKi),DIMENSION(p%NumBlNds, p%numBlades) :: zLocal
    REAL(DbKi)     :: zHub, zTip
    integer(IntKi) :: j, k, File
+   REAL(DbKi)     :: Precone, CosPrecone
+   
    
 
    
@@ -714,7 +716,7 @@ SUBROUTINE WINDS_SetParameters( u_AD, InputFileData, p, O, ErrStat, ErrMess )
    p%FVM%RL_Model%A1     =  6.5e-5_DbKi   
    
       ! Atmospheric properties   
-   p%FVM%RHO      = 1.23_DbKi    ! or p%FVM%RHO = p%Wind%Rho  
+   p%FVM%RHO      = 1.23_DbKi    ! or p%FVM%RHO = p%airDens  
       
       ! Gravity  
    p%FVM%Gravity  =  9.81_DbKi   
@@ -752,6 +754,25 @@ SUBROUTINE WINDS_SetParameters( u_AD, InputFileData, p, O, ErrStat, ErrMess )
    p%Blade_TipRadius = zTip    ! Tip radius of blade. Assume three same blades.    
    p%Blade_HubRadius = zHub    ! Hub radius of blade. Assume three same blades.        
    
+   
+   
+   ! Blade radius
+   Precone = ASIN( DOT_PRODUCT( u_AD%BladeRootMotion(1)%Orientation(3,:,1), &
+                                u_AD%HubMotion%Orientation(1,:,1) ) )  ! precone angle -- do COS later
+
+   CosPrecone = COS( Precone )
+
+   p%Blade_R = zTip * CosPrecone   ! Blade radius
+   
+   
+    IF (.NOT. ALLOCATED(P%BlTwist)) THEN   ! sliu: should move or change this part...
+      ALLOCATE ( P%BlTwist( p%NumBlNds ) , STAT=ErrStat )
+    END IF
+   
+   P%BlTwist(:) = InputFileData%BladeProps(1)%BlTwist(:)
+   
+   
+   
    P%AirFoil_NumFoil = InputFileData%NumAFfiles   ! "The number of airfoil files"
    ! P%AirFoil_NumCl   =         ! "Length of the Alpha and Coefs arrays"	-
    
@@ -764,6 +785,20 @@ SUBROUTINE WINDS_SetParameters( u_AD, InputFileData, p, O, ErrStat, ErrMess )
       P%AirFoil_FoilNm(File) = InputFileData%AFNames(File)
    END DO
    
+    IF (.NOT. ALLOCATED(p%AFindx)) THEN   ! sliu: should move or change this part...
+      ALLOCATE ( p%AFindx( p%NumBlNds, p%numBlades ) , STAT=ErrStat )
+    END IF
+   
+    
+  do k=1,p%numBlades
+     do j=1,p%NumBlNds
+        p%AFindx(j,k)  = InputFileData%BladeProps(k)%BlAFID(j)
+     end do
+  end do    
+    
+  
+  
+   
    !-----------------------------------------------------------------------------------------------------
       ! Parameters for blade element
    IF (.NOT. ALLOCATED( p%BLADE_RTrail ) )      ALLOCATE( p%BLADE_RTrail(NST)) 
@@ -774,6 +809,14 @@ SUBROUTINE WINDS_SetParameters( u_AD, InputFileData, p, O, ErrStat, ErrMess )
    p%BLADE_AeroCen    =  0.25_DbKi   ! sliu: thin airfoil assumption
    p%BLADE_RNodes     =  0.0_DbKi
 
+   
+   
+   
+    IF (.NOT. ALLOCATED(p%BLADE_DR)) THEN   ! sliu: should move or change this part...
+      ALLOCATE ( p%BLADE_DR( p%NumBlNds ) , STAT=ErrStat )
+    END IF   
+   
+   p%BLADE_DR = InputFileData%BladeProps(1)%BlSpn
    
    ! In the Matlab WInDS, these data is stored in NRELrotor.m
    !p%BLADE_RNodes(1) =  InitInp%zTip(1) + p%BLADE_DR(1)/2
@@ -2687,7 +2730,7 @@ CONTAINS
 END SUBROUTINE WINDS_Velocity
 
 !==================================================================================================================================
-SUBROUTINE WINDS_FVMInitial(u, p, O, xd, ErrStat, ErrMess, x, z, y)
+SUBROUTINE WINDS_Initial(u, p, O, xd, ErrStat, ErrMess, x, z, y)
 ! Use blade element and momentum method to calculate the induced velocity at first timestep
 ! Similar with "initials.m" in WInDS by Thomas Sebastian
 ! Called from: AD_CalcOutput  (in AeroDyn.f90)
@@ -2841,7 +2884,7 @@ SUBROUTINE WINDS_FVMInitial(u, p, O, xd, ErrStat, ErrMess, x, z, y)
    END IF
    
    
-END SUBROUTINE WINDS_FVMInitial
+END SUBROUTINE WINDS_Initial
 
 !==================================================================================================================================
 SUBROUTINE WINDS_FVM(u, p, O, xd, N, ErrStat, ErrMess)
@@ -2950,59 +2993,6 @@ SUBROUTINE WINDS_Shear_Model(p, O, ErrStat, ErrMess)
 
 END SUBROUTINE WINDS_Shear_Model
 !==================================================================================================================================
-SUBROUTINE Aero_Forces(u, p, xd, O, ErrStat, ErrMess)
-! Refered to subroutine SetOutputsFromBEMT in AeroDyn.f90
-!................................................................
-  IMPLICIT                        NONE
-
-
-      ! Passed variables
-
-   TYPE(AD_InputType),            INTENT(IN   )  :: u           ! Inputs at Time      
-   TYPE(AD_ParameterType),        INTENT(IN   )  :: p           ! Parameters
-   TYPE(AD_DiscreteStateType),    INTENT(IN   )  :: xd          ! Discrete states at t
-   TYPE(AD_OtherStateType),       INTENT(INOUT)  :: O           ! Other/optimization states
-   INTEGER(IntKi),                INTENT(INOUT)  :: ErrStat     ! Error status of the operation
-   CHARACTER(*),                  INTENT(INOUT)  :: ErrMess      ! Error message if ErrStat /= ErrID_None
-
-
-   integer(intKi)                          :: j                      ! loop counter for nodes
-   integer(intKi)                          :: k                      ! loop counter for blades
-   real(reki)                              :: force(3)
-   real(reki)                              :: moment(3)
-   real(reki)                              :: q
-
-   
-   force(3)    =  0.0_ReKi          
-   moment(1:2) =  0.0_ReKi          
-   do k=1,p%NumBlades
-      do j=1,p%NumBlNds
-                      
-         q = 0.5 * p%airDens * OtherState%BEMT_y%inducedVel(j,k)**2        ! dynamic pressure of the jth node in the kth blade
-         force(1) =  OtherState%BEMT_y%cx(j,k) * q * p%BEMT%chord(j,k)     ! X = normal force per unit length (normal to the plane, not chord) of the jth node in the kth blade
-         force(2) = -OtherState%BEMT_y%cy(j,k) * q * p%BEMT%chord(j,k)     ! Y = tangential force per unit length (tangential to the plane, not chord) of the jth node in the kth blade
-         moment(3)=  OtherState%BEMT_y%cm(j,k) * q * p%BEMT%chord(j,k)**2  ! M = pitching moment per unit length of the jth node in the kth blade
-         
-            ! save these values for possible output later:
-         OtherState%X(j,k) = force(1)
-         OtherState%Y(j,k) = force(2)
-         OtherState%M(j,k) = moment(3)
-         
-            ! note: because force and moment are 1-d arrays, I'm calculating the transpose of the force and moment outputs
-            !       so that I don't have to take the transpose of WithoutSweepPitchTwist(:,:,j,k)
-         y%BladeLoad(k)%Force(:,j)  = matmul( force,  OtherState%WithoutSweepPitchTwist(:,:,j,k) )  ! force per unit length of the jth node in the kth blade
-         y%BladeLoad(k)%Moment(:,j) = matmul( moment, OtherState%WithoutSweepPitchTwist(:,:,j,k) )  ! moment per unit length of the jth node in the kth blade
-         
-      end do !j=nodes
-   end do !k=blades
-      
-   
-
-
-
-
-End SUBROUTINE Aero_Forces
-!==================================================================================================================================
 SUBROUTINE Aero_Loads(u, p, xd, O, ErrStat, ErrMess)
 ! Calculate the aerodynamic loads on the blades (as "perform" function in Matlab WInDS)
 ! Called from: WINDS_FVM (in WINDS.f90)
@@ -3065,9 +3055,9 @@ SUBROUTINE Aero_Loads(u, p, xd, O, ErrStat, ErrMess)
       ! From AeroDyn(Subroutine ELEMFRC)   
    DO IElement = 1, NS
       DO IBlade = 1, NB  
-         Elem_pitch = -1.*ATAN2( -1.*DOT_PRODUCT( u%TurbineComponents%Blade(IBlade)%Orientation(1,:),    &
+         Elem_pitch = -1.*ATAN2( -1.*DOT_PRODUCT( u%BladeRootMotion(IBlade)%Orientation(1,:,1),    &
                                                            u%BladeMotion(IBlade)%Orientation(2,:,IElement) ) , &
-                                              DOT_PRODUCT( u%TurbineComponents%Blade(IBlade)%Orientation(1,:),    &
+                                              DOT_PRODUCT( u%BladeRootMotion(IBlade)%Orientation(1,:,1),    &
                                                            u%BladeMotion(IBlade)%Orientation(1,:,IElement) )   ) 
                     
          PHI      = O%FVM_Other%PERF_AOA(1, N, 1, IElement, IBLADE) + Elem_pitch  ! Elem_pitch is blade element pitch, so no Twist angle needed  .... it has opposite sign with Matlab WInDS, but same with BEM in AeroDyn
@@ -3077,19 +3067,19 @@ SUBROUTINE Aero_Loads(u, p, xd, O, ErrStat, ErrMess)
          
          W2 = O%FVM_Other%KJ%VEL_TOT(1, N, 1, IElement, IBLADE) **2  + O%FVM_Other%KJ%VEL_TOT(2, N, 1, IElement, IBLADE) **2
                   
-         QA       = 0.5 * P%Wind%RHO * W2 * p%BEMT%chord(IElement, 1) ! sliu: do not mutiply P%BLADE_DR(IElement) here and do not divide it in Forces (protential bug in AeroDyn)...
+         QA       = 0.5 * p%airDens * W2 * p%BEMT%chord(IElement, 1) ! sliu: do not mutiply P%BLADE_DR(IElement) here and do not divide it in Forces (protential bug in AeroDyn)...
 
          CPHI     = COS( PHI )
          SPHI     = SIN( PHI )
          DFN      = ( CLA * CPHI + CDA * SPHI ) * QA
          DFT      = ( CLA * SPHI - CDA * CPHI ) * QA
 
-         IF ( P%PMOMENT ) THEN
+         !IF ( P%PMOMENT ) THEN
             PMA  = CMA * QA * p%BEMT%chord(IElement, 1)
-         ELSE
-            PMA  = 0.0_DbKi
-            CMA  = 0.0_DbKi
-         ENDIF
+         !ELSE
+         !   PMA  = 0.0_DbKi
+         !   CMA  = 0.0_DbKi
+         !ENDIF
          
          SPitch    = SIN( Elem_pitch )
          CPitch    = COS( Elem_pitch )
@@ -4512,51 +4502,51 @@ CONTAINS
 
                   
         ! Find coef. of lift and drag 
-      IF (O%WINDS_Timestep > p%FVM%DS_Parms%start_n  .AND.  p%FVM%DS_Parms%DS_Flag ) THEN
-          ! Call Leishman-Beddoes dynamic stall model
-         DO IBlade = 1, NB   
-            DO IElement = 1, NS
-               Check_name =  INDEX((p%AirFoil_FOILNM(P%AirFoil%NFOIL(IElement))), "Cylinder")    
-               IF (Check_name == 0) THEN ! Not "Cylinder"
-                  CALL LB_DynStall(p, O, xd, Iiter, ErrStat, ErrMess, IElement, IBlade, CLA, CDA, CMA, P%AirFoil%NFOIL(IElement))                         
-               ELSE  ! "Cylinder"
-                   ! CALL CLCD_FVM(p, O, xd, ErrStat, ErrMess, O%FVM_Other%KJ%AOA(1, 1, 1, IElement, IBlade), CLA, CDA, CMA, & 
-                   !              P%AirFoil%NFOIL(IElement))    
-                   CALL CLCDCM(p%AFI%AFInfo(p%AFindx(IElement,IBlade)),  O%FVM_Other%KJ%AOA(1, 1, 1, IElement, IBlade), & 
-                               CLA, CDA, CMA, ErrStat, ErrMess)                
-                                 
-               END IF   
-               
-               IF ( ErrStat /= ErrID_None )  THEN      
-                  ErrMess = ' Error (in WInDS): Error occured when finding Cl in Kutta-Joukowski/LB_DynStall subroutine. Please check.'      
-                  RETURN      
-               END IF 
-               
-               IF ( ISNAN(CLA) )  THEN
-                  ErrStat =  ErrID_Fatal
-                  ErrMess = ' Error (in WInDS): Cl is Nan in Kutta-Joukowski/LB_DynStall subroutine. Please check.'   
-                  RETURN      
-               END IF 
-               
-               IF ( ISNAN(CDA) )  THEN
-                  ErrStat =  ErrID_Fatal
-                  ErrMess = ' Error (in WInDS): Cd is Nan in Kutta-Joukowski/LB_DynStall subroutine. Please check.'      
-                  RETURN      
-               END IF
-      
-               O%FVM_Other%KJ%CL(1,1,1,IElement,IBlade) = CLA
-               O%FVM_Other%KJ%CD(1,1,1,IElement,IBlade) = CDA    
-               O%FVM_Other%KJ%CM(1,1,1,IElement,IBlade) = CMA 
-            END DO
-         END DO    
-          
-      ELSE
+      !IF (O%WINDS_Timestep > p%FVM%DS_Parms%start_n  .AND.  p%FVM%DS_Parms%DS_Flag ) THEN
+      !    ! Call Leishman-Beddoes dynamic stall model
+      !   DO IBlade = 1, NB   
+      !      DO IElement = 1, NS
+      !         Check_name =  INDEX((p%AirFoil_FOILNM(p%AFindx(IElement,IBlade))), "Cylinder")    
+      !         IF (Check_name == 0) THEN ! Not "Cylinder"
+      !            CALL LB_DynStall(p, O, xd, Iiter, ErrStat, ErrMess, IElement, IBlade, CLA, CDA, CMA, p%AFindx(IElement,IBlade))                         
+      !         ELSE  ! "Cylinder"
+      !             ! CALL CLCD_FVM(p, O, xd, ErrStat, ErrMess, O%FVM_Other%KJ%AOA(1, 1, 1, IElement, IBlade), CLA, CDA, CMA, & 
+      !             !              p%AFindx(IElement,IBlade))    
+      !             CALL CLCDCM(p%AFI%AFInfo(p%AFindx(IElement,IBlade)),  O%FVM_Other%KJ%AOA(1, 1, 1, IElement, IBlade), & 
+      !                         CLA, CDA, CMA, ErrStat, ErrMess)                
+      !                           
+      !         END IF   
+      !         
+      !         IF ( ErrStat /= ErrID_None )  THEN      
+      !            ErrMess = ' Error (in WInDS): Error occured when finding Cl in Kutta-Joukowski/LB_DynStall subroutine. Please check.'      
+      !            RETURN      
+      !         END IF 
+      !         
+      !         IF ( ISNAN(CLA) )  THEN
+      !            ErrStat =  ErrID_Fatal
+      !            ErrMess = ' Error (in WInDS): Cl is Nan in Kutta-Joukowski/LB_DynStall subroutine. Please check.'   
+      !            RETURN      
+      !         END IF 
+      !         
+      !         IF ( ISNAN(CDA) )  THEN
+      !            ErrStat =  ErrID_Fatal
+      !            ErrMess = ' Error (in WInDS): Cd is Nan in Kutta-Joukowski/LB_DynStall subroutine. Please check.'      
+      !            RETURN      
+      !         END IF
+      !
+      !         O%FVM_Other%KJ%CL(1,1,1,IElement,IBlade) = CLA
+      !         O%FVM_Other%KJ%CD(1,1,1,IElement,IBlade) = CDA    
+      !         O%FVM_Other%KJ%CM(1,1,1,IElement,IBlade) = CMA 
+      !      END DO
+      !   END DO    
+      !    
+      !ELSE
             ! Interpolate over airfoil data tables    ! ~ SUBROUTINE CLCD in AeroSubs.f90         
          DO IBlade = 1, NB   
             DO IElement = 1, NS
                  ! The routine used in original AeroDyn
                !CALL CLCD_FVM(p, O, xd, ErrStat, ErrMess, O%FVM_Other%KJ%AOA(1, 1, 1, IElement, IBlade), CLA, CDA, CMA, & 
-               !              P%AirFoil%NFOIL(IElement))   
+               !              p%AFindx(IElement,IBlade))   
               
                CALL CLCDCM(p%AFI%AFInfo(p%AFindx(IElement,IBlade)),  O%FVM_Other%KJ%AOA(1, 1, 1, IElement, IBlade), & 
                     CLA, CDA, CMA, ErrStat, ErrMess)      
@@ -5365,7 +5355,8 @@ SUBROUTINE VCORE(p, O, xd, N, ErrStat, ErrMess)
       
 
       ! Define initial vortex core size       (sliu: this part should be moved to initials.m)
-   O%FVM_Other%TipSpdRat = p%BLADE_R * O%Rotor%REVS / O%FVM_Other%WIND_INFTYM(1,1,1,1,1)    ! REVS: Rotor rotational speed (i.e. RPM in rad/sec)
+   
+   O%FVM_Other%TipSpdRat = p%BLADE_R * O%Rotor_REVS / O%FVM_Other%WIND_INFTYM(1,1,1,1,1)      ! sliu: blade radius???
    T0 = TwoPi * p%BLADE_TipRadius /(12 * O%FVM_Other%TipSpdRat * O%FVM_Other%WIND_INFTYM(1,1,1,1,1)) 
    
    O%FVM_Other%WAKE_R0(1) = SQRT(4 * p%FVM%RL_Model%ALPHA  * p%FVM%RL_Model%NU * p%FVM%RL_Model%DELTA * T0)   
@@ -5557,6 +5548,8 @@ END SUBROUTINE VCORE
 SUBROUTINE BEM(u, p, xd, O, ErrStat, ErrMess)
 ! This part is modified from AeroDyn v14.02.00c-mlb and Matlab WInDS
 ! Some comments come from:  Algorithmic Outline of Unsteady Aerodynamics (AERODYN) Modules. Project WE-201103. Rick Damiani, Ph.D., P.E.
+! 
+!!!  Check with subroutine SetInputsForBEMT in AeroDyn.f90 in AeroDyn 15.!!!
 !============================      
 
       TYPE(AD_InputType),           INTENT(IN   )  :: u           ! Inputs at Time
@@ -5614,7 +5607,10 @@ SUBROUTINE BEM(u, p, xd, O, ErrStat, ErrMess)
       REAL(DbKi)                 :: CPHI, SPHI
       REAL(DbKi)                 :: W2
     
-      INTEGER(IntKi)             :: Itera_counter      
+      INTEGER(IntKi)             :: Itera_counter 
+      
+      
+      REAL(DbKi)                 :: yaw, tilt
        
       
       NST = p%NumBlNds + 1
@@ -5629,22 +5625,22 @@ SUBROUTINE BEM(u, p, xd, O, ErrStat, ErrMess)
          IBlade = 1     ! Assume all the blades have some Cl and Cd 
           
          ! element pitch angle
-         o%Element%PitNow    = -1.*ATAN2( -1.*DOT_PRODUCT( u%TurbineComponents%Blade(IBlade)%Orientation(1,:),    &
+         o%Element_PitNow    = -1.*ATAN2( -1.*DOT_PRODUCT( u%BladeRootMotion(IBlade)%Orientation(1,:,1),    &
                                                            u%BladeMotion(IBlade)%Orientation(2,:,IElement) ) , &
-                                              DOT_PRODUCT( u%TurbineComponents%Blade(IBlade)%Orientation(1,:),    &
+                                              DOT_PRODUCT( u%BladeRootMotion(IBlade)%Orientation(1,:,1),    &
                                                            u%BladeMotion(IBlade)%Orientation(1,:,IElement) )   )
 
-         SPitch    = SIN( o%Element%PitNow )
-         CPitch    = COS( o%Element%PitNow )
+         SPitch    = SIN( o%Element_PitNow )
+         CPitch    = COS( o%Element_PitNow )
 
 
             ! calculate distance between hub and element
-         tmpVector = u%BladeMotion(IBlade)%Position(:,IElement) - u%TurbineComponents%Hub%Position(:)
-         rLocal = SQRT(   DOT_PRODUCT( tmpVector, u%TurbineComponents%Hub%Orientation(2,:) )**2  &
-                        + DOT_PRODUCT( tmpVector, u%TurbineComponents%Hub%Orientation(3,:) )**2  )          
+         tmpVector = u%BladeMotion(IBlade)%Position(:,IElement) - u%HubMotion%Position(:,1)
+         rLocal = SQRT(   DOT_PRODUCT( tmpVector, u%HubMotion%Orientation(2,:,1) )**2  &
+                        + DOT_PRODUCT( tmpVector, u%HubMotion%Orientation(3,:,1) )**2  )          
           
-            ! determine if MulTabLoc should be set.  
-         O%AirFoil%MulTabLoc = u%MulTabLoc(IElement,IBlade)
+         !   ! determine if MulTabLoc should be set.    ! sliu: just one table
+         !O%AirFoil%MulTabLoc = u%MulTabLoc(IElement,IBlade)
          
          !-------------------------------------------------------------------------------------------
          ! Get wind velocity components; calculate velocity normal to the rotor squared
@@ -5653,8 +5649,18 @@ SUBROUTINE BEM(u, p, xd, O, ErrStat, ErrMess)
          VelocityVec(2) = O%FVM_Other%WIND_INFTY(2, 1, 1, IElement, IBlade) 
          VelocityVec(3) = O%FVM_Other%WIND_INFTY(3, 1, 1, IElement, IBlade)
          
-         VelNormalToRotor2 = ( VelocityVec(3) * o%Rotor%STilt + (VelocityVec(1) * o%Rotor%CYaw               &
-                             - VelocityVec(2) * o%Rotor%SYaw) * o%Rotor%CTilt )**2                                    ! Square of the wind velocity component normal to the rotor
+         
+         ! yaw = OtherState%BEMT_u%chi0  !AeroDyn.f90 ! "Angle between the vector normal to the rotor plane and the wind vector (e.g., the yaw angle in the case of no tilt)"
+         Yaw = ATAN2( -1.*u%HubMotion%Orientation(1,2,1), u%HubMotion%Orientation(1,1,1) )
+
+            ! tilt angle
+         Tilt = ATAN2( u%HubMotion%Orientation(1,3,1), &
+                         SQRT( u%HubMotion%Orientation(1,1,1)**2 + &
+                         u%HubMotion%Orientation(1,2,1)**2 ) )  
+         
+         
+         VelNormalToRotor2 = ( VelocityVec(3) * sin(Tilt) + (VelocityVec(1) * cos(Yaw)               &
+                             - VelocityVec(2) * sin(yaw)) * cos(Tilt) )**2                                    ! Square of the wind velocity component normal to the rotor
 
          tmpVector =  -1.*SPitch*u%BladeMotion(IBlade)%Orientation(1,:,IElement) &
                         + CPitch*u%BladeMotion(IBlade)%Orientation(2,:,IElement)
@@ -5665,10 +5671,10 @@ SUBROUTINE BEM(u, p, xd, O, ErrStat, ErrMess)
          VNWind    =     DOT_PRODUCT( tmpVector, VelocityVec )                                                        ! Component normal to the plane of rotation of wind velocity alone
          VNElement = -1.*DOT_PRODUCT( tmpVector, u%BladeMotion(IBlade)%TranslationVel(:,IElement ) )                 ! Component normal to the plane of rotation of deflection translational velocity alone      
           
-         LAMBDAR =  p%BLADE_RNodes(IElement) * O%Rotor%REVS / O%FVM_Other%WIND_INFTYM(1, 1, 1, 1, 1)                  ! Local speed ratio
+         LAMBDAR =  p%BLADE_RNodes(IElement) * O%Rotor_REVS / O%FVM_Other%WIND_INFTYM(1, 1, 1, 1, 1)                  ! Local speed ratio
          SIGMAP  =  p%numBlades * p%BEMT%chord(IElement, 1) / ( TWOPI * p%BLADE_RNodes(IElement))                            ! Local solidity  
-         TWST    =  - P%Element%TWIST(IElement) 
-         PTCH    =  o%Element%PitNow 
+         TWST    =  - P%BlTwist(IElement) 
+         PTCH    =  o%Element_PitNow 
 
          !-------------------------------------------------------------------------------------------
          ! Initial values for axial and tangential induction factors
@@ -5695,7 +5701,7 @@ SUBROUTINE BEM(u, p, xd, O, ErrStat, ErrMess)
             O%FVM_Other%PERF_AOA(1, 1, 1, IElement, IBlade)   =  ALPHA            
             
             
-            QA       = 0.5 * P%Wind%RHO * W2 * P%BLADE_DR(IElement) * p%BEMT%chord(IElement, 1)
+            QA       = 0.5 * p%airDens * W2 * P%BLADE_DR(IElement) * p%BEMT%chord(IElement, 1)
             CPHI     = COS( PHI )
             SPHI     = SIN( PHI )
             DFN      = ( CLA * CPHI + CDA * SPHI ) * QA
@@ -5776,14 +5782,14 @@ CONTAINS
       VTA    = VTTotal  * ( 1. + AP0 )                ! Effective tangent to plane of rotation velocity
 
       PHI    = ATAN2( VNA, VTA )                      ! Spanwise inflow Angle
-      ALPHA  = PHI - o%Element%PITNOW                 ! AOA
+      ALPHA  = PHI - o%Element_PitNow                 ! AOA
 
       ALPHA = MODULO( ALPHA, TwoPi )
       IF ( ALPHA > Pi )   ALPHA = ALPHA - TwoPi       ! To ensures that Angle lies between -pi and pi.
 
       ! Compute lift and drag coefficients
       ! CALL CLCD_FVM ( P,  O, xd, ErrStat, ErrMess, ALPHA, CLA, CDA, CMA, P%AirFoil%NFoil(J) )
-       CALL CLCDCM(p%AFI%AFInfo(p%AFindx(IElement,IBlade)),  ALPHA, CLA, CDA, CMA, ErrStat, ErrMsg)      
+       CALL CLCDCM(p%AFI%AFInfo(p%AFindx(IElement,IBlade)),  ALPHA, CLA, CDA, CMA, ErrStat, ErrMess)      
       
       IF (ErrStat /= 0 ) RETURN
 
@@ -5794,8 +5800,8 @@ CONTAINS
             
             
       ! Compute loss correction factor due to tip and hub losses       
-      TIPLOSS = 2 / Pi * ACOS(EXP(-(p%numBlades * (InitInp%zTip  (j) - p%BLADE_RNodes(J)) / (2 * p%BLADE_RNodes(J) * SPHI))))      
-      HUBLOSS = 2 / Pi * ACOS(EXP(-(p%numBlades * (p%BLADE_RNodes(J) - InitInp%zHub  (j)) / (2 * InitInp%zHub  (j) * SPHI))))           
+      TIPLOSS = 2 / Pi * ACOS(EXP(-(p%numBlades * (p%Blade_TipRadius - p%BLADE_RNodes(J)) / (2 * p%BLADE_RNodes(J) * SPHI))))      
+      HUBLOSS = 2 / Pi * ACOS(EXP(-(p%numBlades * (p%BLADE_RNodes(J) - p%Blade_HubRadius) / (2 * p%Blade_HubRadius * SPHI))))           
       LOSS    = TIPLOSS * HUBLOSS       
             
             
@@ -5838,27 +5844,23 @@ CONTAINS
     
       
 END SUBROUTINE BEM
-
-
-
-
-
-
 !==================================================================================================================================
 SUBROUTINE CLCDCM(AFInfo, AOA, Cl, Cd, Cm, ErrStat, ErrMsg)                        ! P,  O, xd,  ErrStat, ErrMess, ALPHA, CL, CD, CM, I)       
 ! In AeroDyn 15, this part is modified from subroutine BE_CalcOutputs in BladeElement.f90
    
 
       type(AFInfoType),             intent(in   ) :: AFInfo
-      real(ReKi),                   intent(in   ) :: AOA            ! Angle of attack in radians
-      real(ReKi),                   intent(  out) :: Cl
-      real(ReKi),                   intent(  out) :: Cd
-      real(ReKi),                   intent(  out) :: Cm
+      real(DbKi),                   intent(in   ) :: AOA            ! Angle of attack in radians
+      real(DbKi),                   intent(  out) :: Cl
+      real(DbKi),                   intent(  out) :: Cd
+      real(DbKi),                   intent(  out) :: Cm
       integer(IntKi),               intent(  out) :: ErrStat     ! Error status of the operation
       character(*),                 intent(  out) :: ErrMsg      ! Error message if ErrStat /= ErrID_None
    
       integer                         :: s1
-      
+      real                            :: IntAFCoefs(4)                ! The interpolated airfoil coefficients.
+
+            
       ErrStat = ErrID_None
       ErrMsg  = ''
    
@@ -5913,212 +5915,212 @@ END SUBROUTINE CLCDCM
 
 
 
-!==================================================================================================================================
-SUBROUTINE CLCD_FVM( P,  O, xd,  ErrStat, ErrMess, ALPHA, CLA, CDA, CMA, I)    
-! (From AeroSubs.f90 of AeroDyn module)
-!...........................................................................
-!   This subroutine interpolates airfoil coefficients from a table of airfoil data.  The table must consist
-!   of ALPHA, CL and CD over the entire range of angles that will be encountered.
-  !
- ! VARIABLES:
- !    CLA      = Returned value of lift coefficient
- !    CDA      = Returned value of drag coeff
- !    CMA      = Returned value of pitching moment coeff
- !    ALPHA    = Angle of attack (radians)
- !    AL       = Array containing the angle of attack
- !    CL       = Array containing the lift coeffs. at AL(I)
- !    CD       = Array containing the drag coeffs. at AL(I)
- !    CM       = Array containing the moment coeffs. at AL(I)
- !    I        = Airfoil ID for this element, equal to NFoil(J), where J is the index identifying the blade element
- !    MulTabLoc= Multiple airfoil table location for this element
- !    MulTabMet= Array containing the multiple airfoil table metric
- ! ******************************************************
-!USE                           Airfoil
-   IMPLICIT                      NONE
-   
-   
-      ! Passed Variables:
-   TYPE(AD_ParameterType),       INTENT(IN   )  :: p           ! Parameters
-   TYPE(AD_OtherStateType),      INTENT(INOUT)  :: O!therState ! Initial other/optimization states
-   TYPE(AD_DiscreteStateType),   INTENT(IN   )  :: xd          ! Discrete states at t   
-   INTEGER,                      INTENT(  OUT)  :: ErrStat
-   CHARACTER(*),                 INTENT(  OUT)  :: ErrMess
-
-   ! Passed Variables:
-   REAL(DbKi),INTENT(INOUT)   :: ALPHA
-   REAL(DbKi),INTENT(OUT)     :: CDA
-   REAL(DbKi),INTENT(OUT)     :: CLA
-   REAL(DbKi),INTENT(OUT)     :: CMA
-
-   INTEGER   ,INTENT(IN)      :: I      ! NFOIL(J)
-
-   ! Local Variables:
-
-   REAL(DbKi)                 :: CDA1
-   REAL(DbKi)                 :: CDA2
-   REAL(DbKi)                 :: CLA1
-   REAL(DbKi)                 :: CLA2
-   REAL(DbKi)                 :: CMA1
-   REAL(DbKi)                 :: CMA2
-   REAL(DbKi)                 :: P1
-   REAL(DbKi)                 :: P2
-
-   INTEGER                    :: N1
-   INTEGER                    :: N1P1
-   INTEGER                    :: N2
-   INTEGER                    :: N2P1
-   INTEGER                    :: NTAB
-
-   ErrStat = ErrID_None
-   ErrMess = ""
-
-
-   IF (.NOT. ALLOCATED(P%AirFoil%NFoil) ) THEN
-      CDA = 0
-      CLA = 0
-      CMA = 0
-      ErrStat = ErrID_Fatal
-      RETURN
-   ELSE
-      ErrStat = ErrID_None
-   END IF
-
-   NTAB = P%AirFoil%NLIFT(I)
-
-   IF ( ( ALPHA < O%AirFoil%AL(I,1) ) .OR. ( ALPHA > O%AirFoil%AL(I,NTAB) ) )   THEN
-   !bjj: This error message isn't necessarially accurate:
-      CALL ProgAbort( ' Angle of attack = '//TRIM(Num2LStr(ALPHA*R2D))// &
-                      ' deg is outside data table range. '// & !Blade #'//TRIM(Int2LStr(IBLADE))//&
-                      ' Airfoil '//TRIM(Int2LStr(I))//'.' )
-   !                   ' element '//TRIM(Int2LStr(J))//'.' )
-
-      ErrStat = ErrID_Fatal
-      RETURN
-   ENDIF
-
-   ALPHA = MIN( MAX( ALPHA, O%AirFoil%AL(I,1) ), O%AirFoil%AL(I,NTAB) )
-   CALL LocateBin_Db (ALPHA, O%AirFoil%AL(I,1:NTAB), N1, NTAB )
-
-   IF (N1 == 0) THEN
-      N1   = 1
-      N1P1 = 2
-      P1   = 0.0
-   ELSEIF(N1 == NTAB) THEN
-      N1P1 = N1
-      N1   = N1 - 1
-      P1   = 1.0
-   ELSE
-      N1P1 = N1 + 1
-      P1   = ( ALPHA - O%AirFoil%AL(I, N1) )/( O%AirFoil%AL(I, N1P1) - O%AirFoil%AL(I, N1) )
-   END IF
-
-
-
-
-    ! If the element has multiple airfoil tables, do a 2-D linear interpolation
-    !  for Cl and CD
-
-   IF (P%AirFoil%NTables(I) > 1) THEN
-
-      O%AirFoil%MulTabLoc = MIN( MAX( O%AirFoil%MulTabLoc, P%AirFoil%MulTabMet(I,1) ), P%AirFoil%MulTabMet(I,P%AirFoil%NTables(I)))
-      CALL LocateBin (O%AirFoil%MulTabLoc, P%AirFoil%MulTabMet(I,1:P%AirFoil%NTables(I)),N2,P%AirFoil%NTables(I))
-
-      IF (N2 == 0) THEN
-         N2   = 1
-         N2P1 = 2
-         P2   = 0.0
-      ELSE IF ( N2 == P%AirFoil%NTables(I) ) THEN
-         N2P1 = N2
-         N2   = N2 - 1
-         P2   = 1.0
-      ELSE
-         N2P1 = N2 + 1
-         P2   = (O%AirFoil%MulTabLoc - P%AirFoil%MulTabMet(I,N2))/(P%AirFoil%MulTabMet(I,N2P1)-P%AirFoil%MulTabMet(I,N2))
-      END IF
-
-      CLA1 = O%AirFoil%CL(I,N1,N2) + P1 * ( O%AirFoil%CL(I,N1P1,N2) - O%AirFoil%CL(I,N1,N2) )
-      CDA1 = O%AirFoil%CD(I,N1,N2) + P1 * ( O%AirFoil%CD(I,N1P1,N2) - O%AirFoil%CD(I,N1,N2) )
-      CMA1 = O%AirFoil%CM(I,N1,N2) + P1 * ( O%AirFoil%CM(I,N1P1,N2) - O%AirFoil%CM(I,N1,N2) )
-
-      CLA2 = O%AirFoil%CL(I,N1,N2P1) + P1 * ( O%AirFoil%CL(I,N1P1,N2P1) - O%AirFoil%CL(I,N1,N2P1) )
-      CDA2 = O%AirFoil%CD(I,N1,N2P1) + P1 * ( O%AirFoil%CD(I,N1P1,N2P1) - O%AirFoil%CD(I,N1,N2P1) )
-      CMA2 = O%AirFoil%CM(I,N1,N2P1) + P1 * ( O%AirFoil%CM(I,N1P1,N2P1) - O%AirFoil%CM(I,N1,N2P1) )
-
-      CLA = CLA1 + P2 * ( CLA2 - CLA1 )
-      CDA = CDA1 + P2 * ( CDA2 - CDA1 )
-      CMA = CMA1 + P2 * ( CMA2 - CMA1 )
-
-   ELSE
-
-      CLA  = O%AirFoil%CL(I,N1,1) + P1 * ( O%AirFoil%CL(I,N1P1,1) - O%AirFoil%CL(I,N1,1) )
-      CDA  = O%AirFoil%CD(I,N1,1) + P1 * ( O%AirFoil%CD(I,N1P1,1) - O%AirFoil%CD(I,N1,1) )
-      CMA  = O%AirFoil%CM(I,N1,1) + P1 * ( O%AirFoil%CM(I,N1P1,1) - O%AirFoil%CM(I,N1,1) )
-
-   ENDIF ! (P%AirFoil%NTables(I) > 1)
-   
-CONTAINS
-   ! ====================================================================================================
-   SUBROUTINE LocateBin_Db( XVal, XAry, Ind, AryLen )
-
-      ! This subroutine finds the lower-bound index of an input x-value located in an array.
-      ! On return, Ind has a value such that
-      !           XAry(Ind) <= XVal < XAry(Ind+1), with the exceptions that
-      !             Ind = 0 when XVal < XAry(1), and
-      !          Ind = AryLen when XAry(AryLen) <= XVal.
-      !
-      ! It uses a binary interpolation scheme that takes about log(AryLen)/log(2) steps to converge.
-      ! If the index doesn't change much between calls, LocateStp() may be a better option.
-
-
-      ! Argument declarations.
-
-   INTEGER, INTENT(IN)          :: AryLen                                          ! Length of the array.
-   INTEGER, INTENT(OUT)         :: Ind                                             ! Final (low) index into the array.
-
-   REAL(ReKi), INTENT(IN)       :: XAry    (AryLen)                                ! Array of X values to be interpolated.
-   REAL(DbKi), INTENT(IN)       :: XVal                                            ! X value to be interpolated.
-
-
-      ! Local declarations.
-
-   INTEGER                      :: IHi                                             ! The high index into the arrays.
-   INTEGER                      :: IMid                                            ! The mid-point index between IHi and Ind.
-
-
-
-      ! Let's check the limits first.
-
-   IF ( XVal < XAry(1) )  THEN
-      Ind = 0
-   ELSE IF ( XVal >= XAry(AryLen) )  THEN
-      Ind = AryLen
-   ELSE
-         ! Let's interpolate!
-
-      Ind  = 1
-      IHi  = AryLen
-
-      DO WHILE ( IHi-Ind > 1 )
-
-         IMid = ( IHi + Ind )/2
-
-         IF ( XVal >= XAry(IMid) ) THEN
-            Ind = IMid
-         ELSE
-            IHi = IMid
-         END IF
-
-      END DO
-
-   END IF
-
-   RETURN
-   END SUBROUTINE LocateBin_Db
-   ! ====================================================================================================
-
-END SUBROUTINE CLCD_FVM
-
-!====================================================================================================
+!!==================================================================================================================================
+!SUBROUTINE CLCD_FVM( P,  O, xd,  ErrStat, ErrMess, ALPHA, CLA, CDA, CMA, I)    
+!! (From AeroSubs.f90 of AeroDyn module)
+!!...........................................................................
+!!   This subroutine interpolates airfoil coefficients from a table of airfoil data.  The table must consist
+!!   of ALPHA, CL and CD over the entire range of angles that will be encountered.
+!  !
+! ! VARIABLES:
+! !    CLA      = Returned value of lift coefficient
+! !    CDA      = Returned value of drag coeff
+! !    CMA      = Returned value of pitching moment coeff
+! !    ALPHA    = Angle of attack (radians)
+! !    AL       = Array containing the angle of attack
+! !    CL       = Array containing the lift coeffs. at AL(I)
+! !    CD       = Array containing the drag coeffs. at AL(I)
+! !    CM       = Array containing the moment coeffs. at AL(I)
+! !    I        = Airfoil ID for this element, equal to NFoil(J), where J is the index identifying the blade element
+! !    MulTabLoc= Multiple airfoil table location for this element
+! !    MulTabMet= Array containing the multiple airfoil table metric
+! ! ******************************************************
+!!USE                           Airfoil
+!   IMPLICIT                      NONE
+!   
+!   
+!      ! Passed Variables:
+!   TYPE(AD_ParameterType),       INTENT(IN   )  :: p           ! Parameters
+!   TYPE(AD_OtherStateType),      INTENT(INOUT)  :: O!therState ! Initial other/optimization states
+!   TYPE(AD_DiscreteStateType),   INTENT(IN   )  :: xd          ! Discrete states at t   
+!   INTEGER,                      INTENT(  OUT)  :: ErrStat
+!   CHARACTER(*),                 INTENT(  OUT)  :: ErrMess
+!
+!   ! Passed Variables:
+!   REAL(DbKi),INTENT(INOUT)   :: ALPHA
+!   REAL(DbKi),INTENT(OUT)     :: CDA
+!   REAL(DbKi),INTENT(OUT)     :: CLA
+!   REAL(DbKi),INTENT(OUT)     :: CMA
+!
+!   INTEGER   ,INTENT(IN)      :: I      ! NFOIL(J)
+!
+!   ! Local Variables:
+!
+!   REAL(DbKi)                 :: CDA1
+!   REAL(DbKi)                 :: CDA2
+!   REAL(DbKi)                 :: CLA1
+!   REAL(DbKi)                 :: CLA2
+!   REAL(DbKi)                 :: CMA1
+!   REAL(DbKi)                 :: CMA2
+!   REAL(DbKi)                 :: P1
+!   REAL(DbKi)                 :: P2
+!
+!   INTEGER                    :: N1
+!   INTEGER                    :: N1P1
+!   INTEGER                    :: N2
+!   INTEGER                    :: N2P1
+!   INTEGER                    :: NTAB
+!
+!   ErrStat = ErrID_None
+!   ErrMess = ""
+!
+!
+!   !IF (.NOT. ALLOCATED(P%AirFoil%NFoil) ) THEN
+!   !   CDA = 0
+!   !   CLA = 0
+!   !   CMA = 0
+!   !   ErrStat = ErrID_Fatal
+!   !   RETURN
+!   !ELSE
+!   !   ErrStat = ErrID_None
+!   !END IF
+!
+!   NTAB = P%AirFoil%NLIFT(I)
+!
+!   IF ( ( ALPHA < O%AirFoil%AL(I,1) ) .OR. ( ALPHA > O%AirFoil%AL(I,NTAB) ) )   THEN
+!   !bjj: This error message isn't necessarially accurate:
+!      CALL ProgAbort( ' Angle of attack = '//TRIM(Num2LStr(ALPHA*R2D))// &
+!                      ' deg is outside data table range. '// & !Blade #'//TRIM(Int2LStr(IBLADE))//&
+!                      ' Airfoil '//TRIM(Int2LStr(I))//'.' )
+!   !                   ' element '//TRIM(Int2LStr(J))//'.' )
+!
+!      ErrStat = ErrID_Fatal
+!      RETURN
+!   ENDIF
+!
+!   ALPHA = MIN( MAX( ALPHA, O%AirFoil%AL(I,1) ), O%AirFoil%AL(I,NTAB) )
+!   CALL LocateBin_Db (ALPHA, O%AirFoil%AL(I,1:NTAB), N1, NTAB )
+!
+!   IF (N1 == 0) THEN
+!      N1   = 1
+!      N1P1 = 2
+!      P1   = 0.0
+!   ELSEIF(N1 == NTAB) THEN
+!      N1P1 = N1
+!      N1   = N1 - 1
+!      P1   = 1.0
+!   ELSE
+!      N1P1 = N1 + 1
+!      P1   = ( ALPHA - O%AirFoil%AL(I, N1) )/( O%AirFoil%AL(I, N1P1) - O%AirFoil%AL(I, N1) )
+!   END IF
+!
+!
+!
+!
+!    ! If the element has multiple airfoil tables, do a 2-D linear interpolation
+!    !  for Cl and CD
+!
+!   !IF (P%AirFoil%NTables(I) > 1) THEN
+!   !
+!   !   O%AirFoil%MulTabLoc = MIN( MAX( O%AirFoil%MulTabLoc, P%AirFoil%MulTabMet(I,1) ), P%AirFoil%MulTabMet(I,P%AirFoil%NTables(I)))
+!   !   CALL LocateBin (O%AirFoil%MulTabLoc, P%AirFoil%MulTabMet(I,1:P%AirFoil%NTables(I)),N2,P%AirFoil%NTables(I))
+!   !
+!   !   IF (N2 == 0) THEN
+!   !      N2   = 1
+!   !      N2P1 = 2
+!   !      P2   = 0.0
+!   !   ELSE IF ( N2 == P%AirFoil%NTables(I) ) THEN
+!   !      N2P1 = N2
+!   !      N2   = N2 - 1
+!   !      P2   = 1.0
+!   !   ELSE
+!   !      N2P1 = N2 + 1
+!   !      P2   = (O%AirFoil%MulTabLoc - P%AirFoil%MulTabMet(I,N2))/(P%AirFoil%MulTabMet(I,N2P1)-P%AirFoil%MulTabMet(I,N2))
+!   !   END IF
+!   !
+!   !   CLA1 = O%AirFoil%CL(I,N1,N2) + P1 * ( O%AirFoil%CL(I,N1P1,N2) - O%AirFoil%CL(I,N1,N2) )
+!   !   CDA1 = O%AirFoil%CD(I,N1,N2) + P1 * ( O%AirFoil%CD(I,N1P1,N2) - O%AirFoil%CD(I,N1,N2) )
+!   !   CMA1 = O%AirFoil%CM(I,N1,N2) + P1 * ( O%AirFoil%CM(I,N1P1,N2) - O%AirFoil%CM(I,N1,N2) )
+!   !
+!   !   CLA2 = O%AirFoil%CL(I,N1,N2P1) + P1 * ( O%AirFoil%CL(I,N1P1,N2P1) - O%AirFoil%CL(I,N1,N2P1) )
+!   !   CDA2 = O%AirFoil%CD(I,N1,N2P1) + P1 * ( O%AirFoil%CD(I,N1P1,N2P1) - O%AirFoil%CD(I,N1,N2P1) )
+!   !   CMA2 = O%AirFoil%CM(I,N1,N2P1) + P1 * ( O%AirFoil%CM(I,N1P1,N2P1) - O%AirFoil%CM(I,N1,N2P1) )
+!   !
+!   !   CLA = CLA1 + P2 * ( CLA2 - CLA1 )
+!   !   CDA = CDA1 + P2 * ( CDA2 - CDA1 )
+!   !   CMA = CMA1 + P2 * ( CMA2 - CMA1 )
+!   !
+!   !ELSE
+!
+!      CLA  = O%AirFoil%CL(I,N1,1) + P1 * ( O%AirFoil%CL(I,N1P1,1) - O%AirFoil%CL(I,N1,1) )
+!      CDA  = O%AirFoil%CD(I,N1,1) + P1 * ( O%AirFoil%CD(I,N1P1,1) - O%AirFoil%CD(I,N1,1) )
+!      CMA  = O%AirFoil%CM(I,N1,1) + P1 * ( O%AirFoil%CM(I,N1P1,1) - O%AirFoil%CM(I,N1,1) )
+!
+!   !ENDIF ! (P%AirFoil%NTables(I) > 1)
+!   
+!CONTAINS
+!   ! ====================================================================================================
+!   SUBROUTINE LocateBin_Db( XVal, XAry, Ind, AryLen )
+!
+!      ! This subroutine finds the lower-bound index of an input x-value located in an array.
+!      ! On return, Ind has a value such that
+!      !           XAry(Ind) <= XVal < XAry(Ind+1), with the exceptions that
+!      !             Ind = 0 when XVal < XAry(1), and
+!      !          Ind = AryLen when XAry(AryLen) <= XVal.
+!      !
+!      ! It uses a binary interpolation scheme that takes about log(AryLen)/log(2) steps to converge.
+!      ! If the index doesn't change much between calls, LocateStp() may be a better option.
+!
+!
+!      ! Argument declarations.
+!
+!   INTEGER, INTENT(IN)          :: AryLen                                          ! Length of the array.
+!   INTEGER, INTENT(OUT)         :: Ind                                             ! Final (low) index into the array.
+!
+!   REAL(ReKi), INTENT(IN)       :: XAry    (AryLen)                                ! Array of X values to be interpolated.
+!   REAL(DbKi), INTENT(IN)       :: XVal                                            ! X value to be interpolated.
+!
+!
+!      ! Local declarations.
+!
+!   INTEGER                      :: IHi                                             ! The high index into the arrays.
+!   INTEGER                      :: IMid                                            ! The mid-point index between IHi and Ind.
+!
+!
+!
+!      ! Let's check the limits first.
+!
+!   IF ( XVal < XAry(1) )  THEN
+!      Ind = 0
+!   ELSE IF ( XVal >= XAry(AryLen) )  THEN
+!      Ind = AryLen
+!   ELSE
+!         ! Let's interpolate!
+!
+!      Ind  = 1
+!      IHi  = AryLen
+!
+!      DO WHILE ( IHi-Ind > 1 )
+!
+!         IMid = ( IHi + Ind )/2
+!
+!         IF ( XVal >= XAry(IMid) ) THEN
+!            Ind = IMid
+!         ELSE
+!            IHi = IMid
+!         END IF
+!
+!      END DO
+!
+!   END IF
+!
+!   RETURN
+!   END SUBROUTINE LocateBin_Db
+!   ! ====================================================================================================
+!
+!END SUBROUTINE CLCD_FVM
+!
+!!====================================================================================================
 
     
 END MODULE WINDS_15

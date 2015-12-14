@@ -489,6 +489,8 @@ typedef	^	OtherStateType	MeshMapType	B_L_2_H_P	{:}	-	-	"mapping data structure t
 typedef	^	OtherStateType	IntKi	Aerodyn_Timestep	-	-	-
 typedef	^	OtherStateType	IntKi	WINDS_Timestep	-	-	-	"Current timestep (counts from 1, while FAST counts from 0)  "
 typedef	^	OtherStateType	FVM_OtherStateTYPE	FVM_Other
+typedef	^	OtherStateType	ReKi	Rotor_REVS	-	-	-	"Rotor rotational speed (i.e. RPM in rad/sec)"
+typedef	^	OtherStateType	ReKi	Element_PitNow	-	-	-	"blade element pitch"
 ### Umass WINDS ends
 
 # ..... Parameters ................................................................................................................
@@ -524,10 +526,14 @@ typedef	^	ParameterType	DbKi	Blade_TipRadius	-	-	-
 typedef	^	ParameterType	DbKi	Blade_HubRadius	-	-	-	
 typedef	^	ParameterType	DbKi	Blade_RTrail	{:}	-	-	
 typedef	^	ParameterType	DbKi	Blade_RNodes	{:}	-	-	"sum P%Blade%DR"
+typedef	^	ParameterType	DbKi	Blade_R	-	-	-	"blade radius"
 typedef ^	ParameterType	DbKi	Blade_AeroCen	{:}	-	-	"The relative location of aerodynamic center"
 typedef ^	ParameterType	IntKi	AirFoil_NumFoil	-	-	-	"NumAFfiles"  
 typedef	^	ParameterType	IntKi	AirFoil_NumCL	-	-	-	
 typedef	^	ParameterType	CHARACTER(1024)	AirFoil_FoilNm	{:}			"Number of airfoil data sets"
+typedef	^	ParameterType	INTEGER	AFindx	{:}{:}     -         -        "Index of airfoil data file for blade node location [array of numBladeNodes]"        -
+typedef ^	ParameterType	DbKi	BlTwist	{:}	-	-	
+typedef ^	ParameterType	DbKi	BLADE_DR	{:}	-	-	
 ### Umass WINDS ends 
 
 # ..... Inputs ....................................................................................................................

@@ -293,8 +293,7 @@ subroutine AD_Init( InitInp, u, p, x, xd, z, OtherState, y, Interval, InitOut, E
       !............................................................................................         
    ! if   then   ! use WInDS for aerodynamic calculation
          
-      call WINDS_Init( InputFileData, u, OtherState%WINDS_u, p, x%WINDS, xd%WINDS, z%WINDS, &
-                            OtherState%WINDS, OtherState%WINDS_y, ErrStat2, ErrMsg2 )
+      call WINDS_Init( InputFileData, u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )
          !call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName ) 
          !if (ErrStat >= AbortErrLev) then
          !   call Cleanup()
@@ -859,7 +858,7 @@ subroutine AD_End( u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )
       
       
       !!! Umass ....
-      CALL WINDS_End( t, u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )      
+      CALL WINDS_End( u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )      
       !!! Umass ...
       
       
@@ -1176,7 +1175,8 @@ subroutine SetInputsForBEMT(p, u, OtherState, errStat, errMsg)
      
       ! "Angular velocity of rotor" rad/s
    OtherState%BEMT_u%omega   = dot_product( u%HubMotion%RotationVel(:,1), x_hat_disk )    
-   
+      
+  
       ! "Angle between the vector normal to the rotor plane and the wind vector (e.g., the yaw angle in the case of no tilt)" rad 
    tmp_sz = TwoNorm( OtherState%V_diskAvg )
    if ( EqualRealNos( tmp_sz, 0.0_ReKi ) ) then
