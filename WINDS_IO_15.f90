@@ -15,7 +15,7 @@ MODULE WINDS_IO_15
       
    PUBLIC :: ReadInputWInDS            ! Read in the input file of WInDS(FVM)
    PUBLIC :: Initialize_paraview_files  ! Initialize paraview files 
-   PUBLIC :: CreateVTUembedded15          ! Write paraview files 
+   PUBLIC :: CreateVTUembedded          ! Write paraview files 
    PUBLIC :: Close_paraview_files       ! Close paraview files
    PUBLIC :: LB_load_AirfoilData        ! Load the dynamic stall airfoil data
    PUBLIC :: Write_DS_parameters        ! Write dynamic stall airfoil data
@@ -57,7 +57,8 @@ SUBROUTINE ReadInputWInDS(P, xd, O, ErrStat, ErrMess )
    
    
       ! Function definition      
-   UnIn = 90    ! Some number for index of the file
+   !UnIn = 90    ! Some number for index of the file
+   CALL GetNewUnit( UnIn, ErrStat, ErrMess )
    
    UnEc = -1   
    
@@ -1255,7 +1256,7 @@ SUBROUTINE Initialize_paraview_files(P, xd,  O, ErrStat, ErrMess )
 
 END SUBROUTINE Initialize_paraview_files
 !====================================================================================================
-SUBROUTINE CreateVTUembedded15(IBlade, filename, P, xd, O, ErrStat, ErrMess )
+SUBROUTINE CreateVTUembedded(IBlade, filename, P, xd, O, ErrStat, ErrMess )
 ! Write Paraview file at each WInDS timestep
 !................................................................................................... 
     IMPLICIT                      NONE
@@ -1460,7 +1461,7 @@ SUBROUTINE CreateVTUembedded15(IBlade, filename, P, xd, O, ErrStat, ErrMess )
    
    
 
-END SUBROUTINE CreateVTUembedded15 
+END SUBROUTINE CreateVTUembedded 
 !====================================================================================================
 SUBROUTINE Close_paraview_files(P, xd, O, ErrStat, ErrMess )
 !...................................................................................................    
@@ -1527,7 +1528,9 @@ SUBROUTINE LB_load_AirfoilData(p, O, xd, ErrStat, ErrMess)
    
    
       ! Function definition      
-   UnIn = 200    ! Some number for index of the file
+   !UnIn = 200    ! Some number for index of the file
+   CALL GetNewUnit( UnIn, ErrStat, ErrMess )
+   
    UnEc = -1   
    !-------------------------------------------------------------------------------------------------
    ! Open the WInDS input file  

@@ -68,16 +68,13 @@ CONTAINS
     
     
 !==================================================================================================================================
-SUBROUTINE WINDS_Init(InputFileData, u_AD, p, x, xd, z, O, y, ErrStat, ErrMess)
+SUBROUTINE WINDS_Init(InputFileData, u_AD, p, xd, O, ErrStat, ErrMess)
 
    type(AD_InputFile),          intent(in   ) :: InputFileData  ! All the data in the AeroDyn input file
    type(AD_InputType),          intent(in   ) :: u_AD           ! AD inputs - used for input mesh node positions
    type(AD_ParameterType),      intent(inout) :: p              ! Parameters ! intent out b/c we set the WINDS parameters here
-   type(AD_ContinuousStateType),intent(  out) :: x              ! Initial continuous states
    type(AD_DiscreteStateType),  intent(  out) :: xd             ! Initial discrete states
-   type(AD_ConstraintStateType),intent(  out) :: z              ! Initial guess of the constraint states
-   type(AD_OtherStateType),     intent(  out) :: O     ! Initial other/optimization states
-   type(AD_OutputType),         intent(  out) :: y              ! Initial system outputs (outputs are not calculated;
+   type(AD_OtherStateType),     intent(inout) :: O     ! Initial other/optimization states
                                                                    !   only the output mesh is initialized)
    integer(IntKi),              intent(  out) :: errStat        ! Error status of the operation
    character(*),                intent(  out) :: errMess         ! Error message if ErrStat /= ErrID_None
@@ -98,9 +95,9 @@ SUBROUTINE WINDS_Init(InputFileData, u_AD, p, x, xd, z, O, y, ErrStat, ErrMess)
    
    
     ! Basic parameters.
-   p%FVM%UseWINDS         =    .TRUE.            ! whether to use WINDS
-   O%Aerodyn_Timestep     =    0                ! The timestep used in FAST and AeroDyn (Same as n_t_global in FAST_Prog.f90)
-   O%WINDS_Timestep       =    1                 ! The timestep in  WINDS,  (O%WINDS_Timestep - 1) * Dt_Ratio - 1 = O%Aerodyn_Timestep
+   ! p%FVM%UseWINDS         =    .TRUE.     ! whether to use WINDS
+   O%Aerodyn_Timestep     =    0          ! The timestep used in FAST and AeroDyn (Same as n_t_global in FAST_Prog.f90)
+   O%WINDS_Timestep       =    1          ! The timestep in  WINDS,  (O%WINDS_Timestep - 1) * Dt_Ratio = O%Aerodyn_Timestep
 
   
    O%FVM_Other%TIME%Time_Total  = 0.0            ! Total time of WINDS
@@ -265,22 +262,21 @@ SUBROUTINE WINDS_CalcOutput( time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
    NB  = p%numBlades    
    ! umass debug, to be deleted
    !....................................................           
-
    
    
-   
-      ! Get the inflow wind speed         
-   DO IBlade = 1, NB
-      DO IElement = 1, NS   
-         IF (O%Aerodyn_Timestep == 1) THEN 
-            O%FVM_Other%WIND_INFTY(1, 1, 1, IElement, IBlade) = O%V_diskAvg(1)   
-            O%FVM_Other%WIND_INFTY(2, 1, 1, IElement, IBlade) = O%V_diskAvg(2) 
-            O%FVM_Other%WIND_INFTY(3, 1, 1, IElement, IBlade) = O%V_diskAvg(3)    
-         
-            O%FVM_Other%WIND_INFTYM(1, 1, 1, IElement, IBlade) = SQRT(O%V_diskAvg(1)**2 + O%V_diskAvg(2)**2 + O%V_diskAvg(3)**2 )    
-         END IF 
+      ! Get the inflow wind speed   
+   IF (O%Aerodyn_Timestep ==0) THEN
+      DO IBlade = 1, NB
+         DO IElement = 1, NS   
+               O%FVM_Other%WIND_INFTY(1, 1, 1, IElement, IBlade) = O%V_diskAvg(1)   
+               O%FVM_Other%WIND_INFTY(2, 1, 1, IElement, IBlade) = O%V_diskAvg(2) 
+               O%FVM_Other%WIND_INFTY(3, 1, 1, IElement, IBlade) = O%V_diskAvg(3)    
+            
+               O%FVM_Other%WIND_INFTYM(1, 1, 1, IElement, IBlade) = SQRT(O%V_diskAvg(1)**2 + O%V_diskAvg(2)**2 + O%V_diskAvg(3)**2 )    
+         END DO
       END DO
-   END DO
+      
+   END IF 
    
    ! sliu: move this later      
    O%Rotor_REVS   = dot_product( u%HubMotion%RotationVel(:,1), u%HubMotion%Orientation(1,:,1) )      ! OtherState%BEMT_u%omega (subroutine BEMT_SetParameters in AeroDyn.f90) -> REVS: Rotor rotational speed (i.e. RPM in rad/sec)
@@ -290,104 +286,117 @@ SUBROUTINE WINDS_CalcOutput( time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
    ! The WINDS main part:
    !------------------------------------     
       
-   IF ( p%FVM%UseWINDS ) THEN  
+   !IF ( p%FVM%UseWINDS ) THEN  
       O%FVM_Other%ZTime = time  ! The current simulation time (actual or time of prediction)
       !........................................................
       ! The first timestep
          
-      IF ( O%Aerodyn_Timestep == 1 )  THEN
+      IF ( O%Aerodyn_Timestep == 0 )  THEN
 
              ! Start time
             CALL DATE_AND_TIME ( Values=O%FVM_Other%SimStrtTime )
             CALL CPU_TIME ( O%FVM_Other%UsrTime2 )                                                    ! Initial CPU time   
             O%FVM_Other%UsrTime2 = MAX( 0.0_DbKi, O%FVM_Other%UsrTime2 )  ! CPU_TIME: If a meaningful time cannot be returned, a processor-dependent negative value is returned
-            
+
+             
                ! Calculate positions and velocity of blades   
             CALL WINDS_Kinematics(u, p, O, xd, O%WINDS_Timestep, ErrStat, ErrMess)
-            IF (ErrStat /= 0 ) RETURN
+            IF (ErrStat /= 0 ) THEN
+                ErrMess  = 'Error in WInDS: WINDS_Kinematics'
+                RETURN 
+            END IF
             
             CALL WINDS_Velocity(u, p, O, xd, O%WINDS_Timestep, ErrStat, ErrMess)    
-            IF (ErrStat /= 0 ) RETURN
+            IF (ErrStat /= 0 ) THEN
+                ErrMess  = 'Error in WInDS: WINDS_Velocity'
+                RETURN 
+            END IF
             
-            CALL WINDS_Initial(u, p, O, xd, ErrStat, ErrMess, x, z, y)   !  "initials" in WInDS            
-            IF (ErrStat /= 0 ) RETURN
+            
+            CALL WINDS_BEM(u, p, O, xd, ErrStat, ErrMess, x, z, y)   !  "initials" in WInDS            
+            IF (ErrStat /= 0 ) THEN
+                ErrMess  = 'Error in WInDS: WINDS_BEM'
+                RETURN 
+            END IF
+
             
             DO IBlade=1, p%numBlades
+                                
                DO IElement=1, p%NumBlNds
-                  y%BladeLoad(IBlade)%Force(1,IElement)  = O%FVM_Other%StoredForces(1, 1, 1, IElement, IBlade)   
-                  y%BladeLoad(IBlade)%Force(2,IElement)  = O%FVM_Other%StoredForces(2, 1, 1, IElement, IBlade)   
-                  y%BladeLoad(IBlade)%Force(3,IElement)  = O%FVM_Other%StoredForces(3, 1, 1, IElement, IBlade)   
-                  y%BladeLoad(IBlade)%Moment(1,IElement) = O%FVM_Other%StoredMoments(1, 1, 1, IElement, IBlade)
-                  y%BladeLoad(IBlade)%Moment(2,IElement) = O%FVM_Other%StoredMoments(2, 1, 1, IElement, IBlade)
-                  y%BladeLoad(IBlade)%Moment(3,IElement) = O%FVM_Other%StoredMoments(3, 1, 1, IElement, IBlade)                      
-                   
-                   
-                  O%FVM_Other%PreviousForces(1, 1, 1, IElement, IBlade)  = O%FVM_Other%StoredForces(1, 1, 1, IElement, IBlade)
-                  O%FVM_Other%PreviousForces(2, 1, 1, IElement, IBlade)  = O%FVM_Other%StoredForces(2, 1, 1, IElement, IBlade)
-                  O%FVM_Other%PreviousForces(3, 1, 1, IElement, IBlade)  = O%FVM_Other%StoredForces(3, 1, 1, IElement, IBlade)
-                  O%FVM_Other%PreviousMoments(1, 1, 1, IElement, IBlade) = O%FVM_Other%StoredMoments(1, 1, 1, IElement, IBlade)
-                  O%FVM_Other%PreviousMoments(2, 1, 1, IElement, IBlade) = O%FVM_Other%StoredMoments(2, 1, 1, IElement, IBlade)
-                  O%FVM_Other%PreviousMoments(3, 1, 1, IElement, IBlade) = O%FVM_Other%StoredMoments(3, 1, 1, IElement, IBlade)                               
+            !      y%BladeLoad(IBlade)%Force(1,IElement)  = O%FVM_Other%StoredForces(1, 1, 1, IElement, IBlade)   
+            !      y%BladeLoad(IBlade)%Force(2,IElement)  = O%FVM_Other%StoredForces(2, 1, 1, IElement, IBlade)   
+            !      y%BladeLoad(IBlade)%Force(3,IElement)  = O%FVM_Other%StoredForces(3, 1, 1, IElement, IBlade)   
+            !      y%BladeLoad(IBlade)%Moment(1,IElement) = O%FVM_Other%StoredMoments(1, 1, 1, IElement, IBlade)
+            !      y%BladeLoad(IBlade)%Moment(2,IElement) = O%FVM_Other%StoredMoments(2, 1, 1, IElement, IBlade)
+            !      y%BladeLoad(IBlade)%Moment(3,IElement) = O%FVM_Other%StoredMoments(3, 1, 1, IElement, IBlade)                      
+            !       
+            !       
+                  O%FVM_Other%PreviousForces(1, 1, 1, IElement, IBlade)  = y%BladeLoad(IBlade)%Force(1, IElement)
+                  O%FVM_Other%PreviousForces(2, 1, 1, IElement, IBlade)  = y%BladeLoad(IBlade)%Force(2, IElement)
+                  O%FVM_Other%PreviousForces(3, 1, 1, IElement, IBlade)  = y%BladeLoad(IBlade)%Force(3, IElement)
+                  O%FVM_Other%PreviousMoments(1, 1, 1, IElement, IBlade) = y%BladeLoad(IBlade)%Moment(1, IElement)
+                  O%FVM_Other%PreviousMoments(2, 1, 1, IElement, IBlade) = y%BladeLoad(IBlade)%Moment(2, IElement)
+                  O%FVM_Other%PreviousMoments(3, 1, 1, IElement, IBlade) = y%BladeLoad(IBlade)%Moment(3, IElement)                               
                ENDDO
             ENDDO              
-                       !................................................. sliu: should make a subroutine for this 
-                       ! Debug option to ouput blade element data.
-                       IF (p%FVM%element_output) THEN                          
-                           ! umass debug.......................................
-                           PRINT_NAME1 = 0.0
-                           WRITE (temp_number, "(I6.6)") (1)    ! String of the integer With heading zeros
-                           
-                           ! CL
-                           DO IElement = 1, NS
-                               DO IBlade =  1,NB
-                                  PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_CL(1, 1, 1, IElement, IBlade) 
-                               END DO    
-                           END DO    
-                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_cl_'// TRIM(temp_number))
-                           
-                           ! CD
-                           PRINT_NAME1 = 0.0
-                           DO IElement = 1, NS
-                               DO IBlade =  1,NB
-                                  PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_CD(1, 1, 1, IElement, IBlade) 
-                               END DO    
-                           END DO    
-                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_cd_'// TRIM(temp_number))   
-                           
-                           ! AOA
-                           PRINT_NAME1 = 0.0
-                           DO IElement = 1, NS
-                               DO IBlade =  1,NB
-                                  PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_AOA(1, 1, 1, IElement, IBlade) 
-                               END DO    
-                           END DO    
-                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_aoa_'// TRIM(temp_number))  
-                           
-                           !V_tot                           
-                           DO IBlade =  1,NB
-                              WRITE (temp_1, "(I1)") (IBlade)    ! String of the integer With heading zeros 
-                              PRINT_NAME3 = 0.0
-                              DO IElement = 1, NS
-                                  DO IDim =  1,3
-                                     PRINT_NAME3(IElement, IDIM) = O%FVM_Other%KJ%VEL_TOT(IDIM, 1, 1, IElement, IBlade) 
-                                  END DO    
-                              END DO    
-                              CALL SAVE_TO_TXT_2D(p, PRINT_NAME3 , 'WINDS_vtot_'//temp_1//'_blade_'// TRIM(temp_number)) 
-                           END DO                            
-                          ! umass debug.......................................
-                        end if  
-            
-
+      !                 !................................................. sliu: should make a subroutine for this 
+      !                 ! Debug option to ouput blade element data.
+      !                 IF (p%FVM%element_output) THEN                          
+      !                     ! umass debug.......................................
+      !                     PRINT_NAME1 = 0.0
+      !                     WRITE (temp_number, "(I6.6)") (1)    ! String of the integer With heading zeros
+      !                     
+      !                     ! CL
+      !                     DO IElement = 1, NS
+      !                         DO IBlade =  1,NB
+      !                            PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_CL(1, 1, 1, IElement, IBlade) 
+      !                         END DO    
+      !                     END DO    
+      !                     CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_cl_'// TRIM(temp_number))
+      !                     
+      !                     ! CD
+      !                     PRINT_NAME1 = 0.0
+      !                     DO IElement = 1, NS
+      !                         DO IBlade =  1,NB
+      !                            PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_CD(1, 1, 1, IElement, IBlade) 
+      !                         END DO    
+      !                     END DO    
+      !                     CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_cd_'// TRIM(temp_number))   
+      !                     
+      !                     ! AOA
+      !                     PRINT_NAME1 = 0.0
+      !                     DO IElement = 1, NS
+      !                         DO IBlade =  1,NB
+      !                            PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_AOA(1, 1, 1, IElement, IBlade) 
+      !                         END DO    
+      !                     END DO    
+      !                     CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_aoa_'// TRIM(temp_number))  
+      !                     
+      !                     !V_tot                           
+      !                     DO IBlade =  1,NB
+      !                        WRITE (temp_1, "(I1)") (IBlade)    ! String of the integer With heading zeros 
+      !                        PRINT_NAME3 = 0.0
+      !                        DO IElement = 1, NS
+      !                            DO IDim =  1,3
+      !                               PRINT_NAME3(IElement, IDIM) = O%FVM_Other%KJ%VEL_TOT(IDIM, 1, 1, IElement, IBlade) 
+      !                            END DO    
+      !                        END DO    
+      !                        CALL SAVE_TO_TXT_2D(p, PRINT_NAME3 , 'WINDS_vtot_'//temp_1//'_blade_'// TRIM(temp_number)) 
+      !                     END DO                            
+      !                    ! umass debug.......................................
+      !                  end if  
+      !      
+      !
             ! ! End time
             !CALL CPU_TIME(Time_2) 
             !O%FVM_Other%TIME%Time_Total = O%FVM_Other%TIME%Time_Total + Time_2 - Time_1  
               
-            O%WINDS_Timestep =O%WINDS_Timestep + 1      ! WInDS internal timestep, which is 1 ,2, 3...
+      O%WINDS_Timestep =O%WINDS_Timestep + 1      ! WInDS internal timestep, which is 1 ,2, 3...
 
       !........................................................
       ! The global timesteps used by WINDS
            
-      ELSE IF (MOD(O%Aerodyn_Timestep -1 , p%FVM%DT_RATIO) == 0 ) THEN
+      ELSE IF (MOD(O%Aerodyn_Timestep , p%FVM%DT_RATIO) == 0 ) THEN
             
                 ! IF ( p%FVM%SteadyFlag ) THEN ! Make it steady flow
                DO IBlade = 1, p%numBlades
@@ -432,70 +441,70 @@ SUBROUTINE WINDS_CalcOutput( time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
                      O%FVM_Other%PreviousMoments(3, 1, 1, IElement, IBlade) = y%BladeLoad(IBlade)%Moment(3,IElement)                       
                   ENDDO
                ENDDO  
-               
-                       ! Debug option to ouput blade element data.
-                       IF (p%FVM%element_output) THEN
-                          !!..........................................................
-                          !!Umass debug              
-                           WRITE (temp_number , "(I6.6)") ( O%WINDS_Timestep )   
-                      
-                           ! CL
-                           PRINT_NAME1 = 0.0
-                           DO IElement = 1, NS
-                               DO IBlade =  1,NB
-                                   PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_CL(1, O%WINDS_Timestep, 1, IElement, IBlade) 
-                               END DO  
-                           END DO  
-                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_cl_'//TRIM(temp_number))    ! Write cl to text
-                       
-                           ! CD
-                           PRINT_NAME1 = 0.0
-                           DO IElement = 1, NS
-                               DO IBlade =  1,NB
-                                   PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_CD(1, O%WINDS_Timestep, 1, IElement, IBlade) 
-                               END DO  
-                           END DO  
-                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_cd_'//TRIM(temp_number))    ! Write cd to text    
-                       
-                       
-                           ! AOA
-                           PRINT_NAME1 = 0.0
-                           DO IElement = 1, NS
-                               DO IBlade =  1,NB
-                                  PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_AOA(1, O%WINDS_Timestep, 1, IElement, IBlade) 
-                               END DO    
-                           END DO    
-                           CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_aoa_'// TRIM(temp_number))  
-                           
-
-                            !V_tot                           
-                           DO IBlade =  1,NB
-                              WRITE (temp_1, "(I1)") (IBlade)    ! String of the integer With heading zeros 
-                              PRINT_NAME3 = 0.0
-                              DO IElement = 1, NS
-                                  DO IDim =  1,3
-                                     PRINT_NAME3(IElement, IDIM) = O%FVM_Other%KJ%VEL_TOT(IDIM, O%WINDS_Timestep, 1, IElement, IBlade) 
-                                  END DO    
-                              END DO    
-                              CALL SAVE_TO_TXT_2D(p, PRINT_NAME3 , 'WINDS_vtot_'//temp_1//'_blade_'// TRIM(temp_number)) 
-                           END DO                            
-                           !!Umass debug         
-                           !!..........................................................
-                        END IF         
-                    
-              O%WINDS_Timestep = O%WINDS_Timestep + 1      ! WInDS internal timestep, which is 1 ,2, 3...
-              
-              ! sliu: Curently, I don't access to get the FAST simulation time. User needs to set the simulation time seperately....
-               IF (O%WINDS_Timestep > p%FVM%NT ) THEN
-                   ErrStat = ErrID_Fatal
-                   ErrMESS = ' The user setting simulation time of WInDS is shorter than the FAST simulation time. '//&
-                              ' Please check the setting. '
-                   RETURN
-               END IF
-               
-         !........................................................
-         ! The global timesteps ignored by WINDS 
-                
+      !         
+      !                 ! Debug option to ouput blade element data.
+      !                 IF (p%FVM%element_output) THEN
+      !                    !!..........................................................
+      !                    !!Umass debug              
+      !                     WRITE (temp_number , "(I6.6)") ( O%WINDS_Timestep )   
+      !                
+      !                     ! CL
+      !                     PRINT_NAME1 = 0.0
+      !                     DO IElement = 1, NS
+      !                         DO IBlade =  1,NB
+      !                             PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_CL(1, O%WINDS_Timestep, 1, IElement, IBlade) 
+      !                         END DO  
+      !                     END DO  
+      !                     CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_cl_'//TRIM(temp_number))    ! Write cl to text
+      !                 
+      !                     ! CD
+      !                     PRINT_NAME1 = 0.0
+      !                     DO IElement = 1, NS
+      !                         DO IBlade =  1,NB
+      !                             PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_CD(1, O%WINDS_Timestep, 1, IElement, IBlade) 
+      !                         END DO  
+      !                     END DO  
+      !                     CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_cd_'//TRIM(temp_number))    ! Write cd to text    
+      !                 
+      !                 
+      !                     ! AOA
+      !                     PRINT_NAME1 = 0.0
+      !                     DO IElement = 1, NS
+      !                         DO IBlade =  1,NB
+      !                            PRINT_NAME1(IElement, IBlade) = O%FVM_Other%PERF_AOA(1, O%WINDS_Timestep, 1, IElement, IBlade) 
+      !                         END DO    
+      !                     END DO    
+      !                     CALL SAVE_TO_TXT_2D(p, PRINT_NAME1 , 'WINDS_aoa_'// TRIM(temp_number))  
+      !                     
+      !
+      !                      !V_tot                           
+      !                     DO IBlade =  1,NB
+      !                        WRITE (temp_1, "(I1)") (IBlade)    ! String of the integer With heading zeros 
+      !                        PRINT_NAME3 = 0.0
+      !                        DO IElement = 1, NS
+      !                            DO IDim =  1,3
+      !                               PRINT_NAME3(IElement, IDIM) = O%FVM_Other%KJ%VEL_TOT(IDIM, O%WINDS_Timestep, 1, IElement, IBlade) 
+      !                            END DO    
+      !                        END DO    
+      !                        CALL SAVE_TO_TXT_2D(p, PRINT_NAME3 , 'WINDS_vtot_'//temp_1//'_blade_'// TRIM(temp_number)) 
+      !                     END DO                            
+      !                     !!Umass debug         
+      !                     !!..........................................................
+      !                  END IF         
+      !              
+      !        O%WINDS_Timestep = O%WINDS_Timestep + 1      ! WInDS internal timestep, which is 1 ,2, 3...
+      !        
+      !        ! sliu: Curently, I don't access to get the FAST simulation time. User needs to set the simulation time seperately....
+      !         IF (O%WINDS_Timestep > p%FVM%NT ) THEN
+      !             ErrStat = ErrID_Fatal
+      !             ErrMESS = ' The user setting simulation time of WInDS is shorter than the FAST simulation time. '//&
+      !                        ' Please check the setting. '
+      !             RETURN
+      !         END IF
+      !         
+      !   !........................................................
+      !   ! The global timesteps ignored by WINDS 
+      !          
       ELSE
               ! Copy the load from the previous timestep(refer to O%Aerodyn_Timestep)
             DO IBlade=1, p%numBlades
@@ -508,12 +517,11 @@ SUBROUTINE WINDS_CalcOutput( time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
                   y%BladeLoad(IBlade)%Moment(3,IElement) = O%FVM_Other%PreviousMoments(3, 1, 1, IElement, IBlade)
                ENDDO
             ENDDO         
-      END IF ! ( O%Aerodyn_Timestep == -1 ) 
+      END IF ! 
          
       O%Aerodyn_Timestep = O%Aerodyn_Timestep  + 1   ! Update the global timestep
 
-
-   ENDIF  ! p%FVM%UseWINDS
+   !ENDIF  ! p%FVM%UseWINDS
 
    
    
@@ -833,9 +841,14 @@ SUBROUTINE WINDS_SetParameters( u_AD, InputFileData, p, O, ErrStat, ErrMess )
       p%BLADE_RNodes(IElement) = p%BLADE_RNodes(IElement-1) + (InputFileData%BladeProps(1)%BlSpn(IElement-1) + InputFileData%BladeProps(1)%BlSpn(IElement))/2    !  p%BLADE_RNodes(IElement-1) +(InputFileData%BladeProps(1)%BlSpn(IElement-1) + p%BLADE_DR(IElement))/2
    END DO
 
+   !print *, "..............."
+   !print *, p%FVM%NST   ! debug
+   !print *, "..............."
+   !
+   
    p%BLADE_RTrail(1) = zTip
    DO IElement2 = 2, p%FVM%NST
-      p%BLADE_RTrail (IElement2) = zLocal(IElement,1)   ! p%BLADE_RTrail(IElement2 -1) + InputFileData%BladeProps(1)%BlSpn(IElement2 -1)
+      p%BLADE_RTrail (IElement2) = zLocal(IElement-1,1)   ! p%BLADE_RTrail(IElement2 -1) + InputFileData%BladeProps(1)%BlSpn(IElement2 -1)
    END DO       
 
    
@@ -2728,9 +2741,8 @@ CONTAINS
    !....................................................................
    
 END SUBROUTINE WINDS_Velocity
-
 !==================================================================================================================================
-SUBROUTINE WINDS_Initial(u, p, O, xd, ErrStat, ErrMess, x, z, y)
+SUBROUTINE WINDS_BEM(u, p, O, xd, ErrStat, ErrMess, x, z, y)
 ! Use blade element and momentum method to calculate the induced velocity at first timestep
 ! Similar with "initials.m" in WInDS by Thomas Sebastian
 ! Called from: AD_CalcOutput  (in AeroDyn.f90)
@@ -2803,8 +2815,6 @@ SUBROUTINE WINDS_Initial(u, p, O, xd, ErrStat, ErrMess, x, z, y)
        END DO
    END DO             
    !END IF  ! p%FVM%SteadyFlag  
-   
-     
 
      ! Substitute in initial values and truncate size of variables by timestep
    O%FVM_Other%WAKE_DOMAIN(:,1,1,:,:)  =  O%FVM_Other%POS_QUARTER(:,1,1,:,:)  
@@ -2818,10 +2828,27 @@ SUBROUTINE WINDS_Initial(u, p, O, xd, ErrStat, ErrMess, x, z, y)
    O%FVM_Other%VEL_DOMAIN_RK(:,:,2,:,:)  =  O%FVM_Other%VEL_DOMAIN(:,:,1,:,:)
    O%FVM_Other%VEL_DOMAIN_RK(:,:,3,:,:)  =  O%FVM_Other%VEL_DOMAIN(:,:,1,:,:) 
    
-            
-      ! Define initial induced velocities via 1st-order methods         
-   CALL BEM(u, p, xd, O, ErrStat, ErrMess)  
-   IF (ErrStat /= 0 ) RETURN
+
+   
+      ! Define initial induced velocities via 1st-order methods    
+   ! Option 1
+   !CALL BEM(u, p, xd, O, ErrStat, ErrMess)  
+   !IF (ErrStat /= 0 ) RETURN
+   
+   !Option 2 : Copy from BEMT.f90
+   do IBlade=1,p%NumBlades
+      do IElement=1,p%NumBlNds
+         O%FVM_Other%PERF_CL(1, 1, 1, IElement, IBlade)  = O%BEMT_y%cl(IElement,IBlade)
+      end do
+   end do
+   
+   
+   
+   
+   
+   
+   
+   
    
       ! Define initial vortex strength      
             ! Use Kutta-Joukowski theorem to define bound circulation strength         
@@ -2832,8 +2859,6 @@ SUBROUTINE WINDS_Initial(u, p, O, xd, ErrStat, ErrMess, x, z, y)
      
       END DO !IElement
    END DO !IBlade      
-
-
 
             ! Compute spanwise change in bound filament to compute first set of trailing filaments            
    DO IBlade = 1,NB    
@@ -2852,7 +2877,6 @@ SUBROUTINE WINDS_Initial(u, p, O, xd, ErrStat, ErrMess, x, z, y)
    END DO !IBlade      
 
 
-
             ! Shed filaments computed via spanwise summation of trailing filaments (ensure Kelvin's theorem is satisfied)
      Do IBlade = 1, NB  
          Temp1 = 0.0 
@@ -2862,7 +2886,6 @@ SUBROUTINE WINDS_Initial(u, p, O, xd, ErrStat, ErrMess, x, z, y)
             O%FVM_Other%WAKE_GAMMA_SHED(1, 2, 1, IElement, IBlade) =  - Temp1
          END DO
      END DO            
-            
   
    
       ! Modify core size using Ramasamy-Leishman model
@@ -2882,9 +2905,9 @@ SUBROUTINE WINDS_Initial(u, p, O, xd, ErrStat, ErrMess, x, z, y)
          WRITE(IBlade+10, "(A)") (TRIM(LINE))         
       END DO   
    END IF
+  
    
-   
-END SUBROUTINE WINDS_Initial
+END SUBROUTINE WINDS_BEM
 
 !==================================================================================================================================
 SUBROUTINE WINDS_FVM(u, p, O, xd, N, ErrStat, ErrMess)

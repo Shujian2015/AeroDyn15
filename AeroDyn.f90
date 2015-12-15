@@ -287,23 +287,19 @@ subroutine AD_Init( InitInp, u, p, x, xd, z, OtherState, y, Interval, InitOut, E
    !end if      
       
     
-         
       !............................................................................................
       ! Initialize the WInDS module  (Umass WEC)
       !............................................................................................         
    ! if   then   ! use WInDS for aerodynamic calculation
          
-      call WINDS_Init( InputFileData, u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )
+   call WINDS_Init( InputFileData, u, p, xd, OtherState, ErrStat, ErrMsg )
          !call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName ) 
          !if (ErrStat >= AbortErrLev) then
          !   call Cleanup()
          !   return
          !end if         
          
-    ! end if     
-         
-         
-         
+   ! end if    
          
          
          
@@ -338,6 +334,8 @@ subroutine AD_Init( InitInp, u, p, x, xd, z, OtherState, y, Interval, InitOut, E
          call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    end if
       
+  
+   
             
    call Cleanup() 
       
@@ -857,7 +855,7 @@ subroutine AD_End( u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )
 
       
       
-      !!! Umass ....
+      !!! Umass ....  ! print some info to files
       CALL WINDS_End( u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )      
       !!! Umass ...
       
@@ -989,6 +987,7 @@ subroutine AD_CalcOutput( t, u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )
    ErrStat = ErrID_None
    ErrMsg  = ""
 
+  
    
    call SetInputs(p, u, OtherState, errStat2, errMsg2)      
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
@@ -1005,6 +1004,11 @@ subroutine AD_CalcOutput( t, u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )
       call ADTwr_CalcOutput(p, u, OtherState, y, ErrStat2, ErrMsg2 )
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)      
    end if
+   
+   !! Umass WInDS
+   CALL WINDS_CalcOutput( t, u, p, x, xd, z, OtherState, y, ErrStat, ErrMsg )
+   !! Umass WInDS
+   
          
    !-------------------------------------------------------   
    !     get values to output to file:  
@@ -1189,7 +1193,7 @@ subroutine SetInputsForBEMT(p, u, OtherState, errStat, errMsg)
       OtherState%BEMT_u%chi0 = acos( tmp_sz_y )
       
    end if
-   
+    
       ! "Azimuth angle" rad
    do k=1,p%NumBlades
       z_hat = u%BladeRootMotion(k)%Orientation(3,:,1)      
